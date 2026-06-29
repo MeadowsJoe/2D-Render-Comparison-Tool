@@ -30,6 +30,7 @@ SOFTWARE.
 #include "Graphics/Texture.h"
 #include "Graphics/GEMLoader.h"
 #include "Graphics/RTSceneLoader.h"
+#include "Graphics/Sprites.h"
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -83,7 +84,30 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
     // Load and build the scene
     scene.reset();
-    loadScene(&core, &scene, &textures, &camera, sceneName);
+    //loadScene(&core, &scene, &textures, &camera, sceneName); // Replaced by initQuad
+    // Initialize Sprite
+    SpriteSystem spriteSys;
+    spriteSys.init(&core, &scene);
+
+    // Create sprites in the scene
+    Sprite a; a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = 0;
+    Sprite b; b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = 0;
+    Sprite c; c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = 0;
+    spriteSys.addSprite(&scene, a);
+    spriteSys.addSprite(&scene, b);
+    spriteSys.addSprite(&scene, c);
+
+    // Camera Setup
+    Matrix P = Matrix::perspective(0.1f, 100.0f, (float)width / (float)height, 1.0f);
+    camera.init(P, width, height);
+    Matrix V = Matrix::lookAt(Vec3(0.0f, 0.0f, 500.0f), Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
+    camera.initView(V);
+    camera.moveSpeed = 0.1f;
+
+    // Use a default black environment
+    float env[3] = { 0, 0, 0 };
+    scene.environmentMap = textures.loadFromMemory(&core, 1, 1, 3, env);
+    scene.envLum = 0;
     scene.build(&core);
 
     // Update scene drawing information with the current shader
