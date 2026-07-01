@@ -29,9 +29,46 @@ inline void buildUnitQuad(std::vector<STATIC_VERTEX>& verts, std::vector<unsigne
 	indices = { 0, 1, 2, 0, 2, 3 };
 }
 
+// TLAS rewrite on sprite transform update
+void updateTLAS(Core* core, Scene* scene)
+{
+	// Map the instance buffer and update instance descriptors for each sprite.
+	D3D12_RAYTRACING_INSTANCE_DESC* instanceDataDesc;
+	scene->instances->Map(0, NULL, reinterpret_cast<void**>(&instanceDataDesc));
+	for (int i = 0; i < scene->meshes.size(); i++)
+	{
+		memcpy(&instanceDataDesc[i].Transform, &scene->transforms[i], sizeof(float) * 12);
+	}
+	// Optionally unmap the instance buffer if needed
+	scene->instances->Unmap(0, NULL);
+
+	// Set up the TLAS build description
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc{};
+	buildDesc.DestAccelerationStructureData = scene->tlas->GetGPUVirtualAddress();
+	buildDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	buildDesc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE |
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+	buildDesc.Inputs.NumDescs = (unsigned int)scene->meshes.size();
+	buildDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	buildDesc.Inputs.InstanceDescs = scene->instances->GetGPUVirtualAddress();
+	buildDesc.ScratchAccelerationStructureData = scene->tlasBuildResource->GetGPUVirtualAddress();
+	buildDesc.SourceAccelerationStructureData = scene->tlas->GetGPUVirtualAddress();
+
+
+	// Build the TLAS using the command list
+	core->graphicsCommandList->BuildRaytracingAccelerationStructure(&buildDesc, 0, NULL);
+
+	// Insert a UAV barrier to ensure TLAS build is complete before proceeding
+	D3D12_RESOURCE_BARRIER barrier{};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	barrier.UAV.pResource = scene->tlas;
+	core->graphicsCommandList->ResourceBarrier(1, &barrier);
+}
+
 
 struct Sprite
 {
+	Vec3 startPos;
 	Vec3 pos;
 	float w, h;
 	int textureID;
@@ -44,6 +81,16 @@ public:
 	std::string key;
 	std::vector<Sprite> sprites;
 
+	TLASTransform makeTranform(Vec3 pos, float w, float h)
+	{
+		TLASTransform t;
+
+		t.w[0][0] = w; t.w[0][1] = 0.0f;   t.w[0][2] = 0.0f; t.w[0][3] = pos.x;
+		t.w[1][0] = 0.0f;  t.w[1][1] = h; t.w[1][2] = 0.0f; t.w[1][3] = pos.y;
+		t.w[2][0] = 0.0f;  t.w[2][1] = 0.0f;   t.w[2][2] = 1.0f; t.w[2][3] = pos.z;
+
+		return t;
+	}
 
 	// Create shared quad
 	// Store in global buffers
@@ -62,16 +109,24 @@ public:
 		quad->init(core, verts, indices);
 	}
 
+	void update(Scene* scene, float t)
+	{
+		for (int i = 0; i < sprites.size(); i ++)
+		{
+			sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
+
+			TLASTransform tr = makeTranform(sprites[i].pos, sprites[i].w, sprites[i].h);
+
+			scene->transforms[i] = tr;
+		}
+	}
 
 	// Add one sprite instance
 	void addSprite(Scene* scene, const Sprite& s)
 	{
 		sprites.push_back(s);
-		TLASTransform t;
-
-		t.w[0][0] = s.w; t.w[0][1] = 0.0f;   t.w[0][2] = 0.0f; t.w[0][3] = s.pos.x;
-		t.w[1][0] = 0.0f;  t.w[1][1] = s.h; t.w[1][2] = 0.0f; t.w[1][3] = s.pos.y;
-		t.w[2][0] = 0.0f;  t.w[2][1] = 0.0f;   t.w[2][2] = 1.0f; t.w[2][3] = s.pos.z;
+		
+		TLASTransform t = makeTranform(s.pos, s.w, s.h);
 
 		scene->meshes.push_back(quad);
 		scene->transforms.push_back(t);

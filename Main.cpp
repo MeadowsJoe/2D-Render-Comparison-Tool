@@ -90,9 +90,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     spriteSys.init(&core, &scene);
 
     // Create sprites in the scene
-    Sprite a; a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = 0;
-    Sprite b; b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = 0;
-    Sprite c; c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = 0;
+    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = 0;
+    Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = 0;
+    Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = 0;
     spriteSys.addSprite(&scene, a);
     spriteSys.addSprite(&scene, b);
     spriteSys.addSprite(&scene, c);
@@ -184,6 +184,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         // Apply shader changes and bind resources for the render target
         shaders.apply(&core, shaderName);
         core.bindRTUAV();
+
+        spriteSys.update(&scene, t);
+        updateTLAS(&core, &scene);
 
         // Reapply shader and render the scene
         shaders.apply(&core, shaderName);

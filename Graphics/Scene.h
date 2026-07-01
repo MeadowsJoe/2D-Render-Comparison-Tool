@@ -410,7 +410,7 @@ public:
             // Copy the 3x4 transform for this instance
             memcpy(&instanceDataDesc[i].Transform, &transforms[i], sizeof(float) * 12);
         }
-        // Optionally unmap the instance buffer if needed (currently commented out)
+        // Optionally unmap the instance buffer if needed
         instances->Unmap(0, NULL);
 
         // Set up the TLAS build description
