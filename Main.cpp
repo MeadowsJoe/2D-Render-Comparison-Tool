@@ -68,7 +68,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     win.create(width, height, "GEGPUPathtracer");
 
     // Initialize core graphics and shaders
-    std::string shaderName = "PT.hlsl";
+    std::string shaderName = "Sprite.hlsl";
     Core core;
     core.init(win.hwnd, width, height);
 
@@ -89,10 +89,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     SpriteSystem spriteSys;
     spriteSys.init(&core, &scene);
 
+    // Load Texture and retrive ID
+    textures.load(&core, "Sprites/alienGreen_stand.png");
+    int texID = textures.find("Sprites/alienGreen_stand.png");
+
     // Create sprites in the scene
-    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = 0;
-    Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = 0;
-    Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = 0;
+    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = texID;
+    Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = texID;
+    Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = texID;
     spriteSys.addSprite(&scene, a);
     spriteSys.addSprite(&scene, b);
     spriteSys.addSprite(&scene, c);
