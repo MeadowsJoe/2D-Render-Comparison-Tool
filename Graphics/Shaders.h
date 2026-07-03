@@ -269,6 +269,7 @@ public:
         // Define the hit group for ray tracing
         D3D12_HIT_GROUP_DESC hitGroupDesc{};
         hitGroupDesc.ClosestHitShaderImport = L"ClosestHit";
+        hitGroupDesc.AnyHitShaderImport = L"AnyHit";
         hitGroupDesc.HitGroupExport = L"HitGroup";
         hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
 

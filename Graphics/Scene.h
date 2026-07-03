@@ -136,7 +136,7 @@ public:
         // Set up the geometry description for the BLAS using {} initializer
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE; // Mark as opaque geometry
+        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
         geometryDesc.Triangles.Transform3x4 = 0;
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;

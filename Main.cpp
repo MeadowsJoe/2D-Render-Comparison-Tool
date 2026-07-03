@@ -97,9 +97,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = texID;
     Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = texID;
     Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = texID;
+    Sprite d; d.startPos = d.pos = Vec3(0.7f, 0.0f, -200.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = texID;
     spriteSys.addSprite(&scene, a);
     spriteSys.addSprite(&scene, b);
     spriteSys.addSprite(&scene, c);
+    spriteSys.addSprite(&scene, d);
 
     // Camera Setup
     Matrix P = Matrix::perspective(0.1f, 100.0f, (float)width / (float)height, 1.0f);

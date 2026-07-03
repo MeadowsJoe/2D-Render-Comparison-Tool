@@ -658,3 +658,14 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
     // Trace the indirect ray
     TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
 }
+
+[shader("anyhit")]
+void AnyHit(inout Payload payload, BuiltInTriangleIntersectionAttributes attrib)
+{
+    HitData hitData = calculateHitData(attrib);
+
+    uint texID = hitData.instance.bsdfAlbedoID & 0xffff;
+    
+    float a = textures[texID].SampleLevel(samplerState, hitData.uv, 0).a;
+    if (a < 0.5f) IgnoreHit();
+}

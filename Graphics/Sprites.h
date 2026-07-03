@@ -109,6 +109,8 @@ public:
 		quad->init(core, verts, indices);
 	}
 
+
+	// Update triangles pos, create new matrix and update scene transforms
 	void update(Scene* scene, float t)
 	{
 		for (int i = 0; i < sprites.size(); i ++)
@@ -132,11 +134,8 @@ public:
 		scene->transforms.push_back(t);
 
 		InstanceData inst;
-		inst.updateBSDFType(1);
+		inst.updatetextureID(s.textureID);
 		inst.startIndex = scene->indexOffset[key];
-		inst.bsdfData[0] = 1;
-		inst.bsdfData[1] = 0;
-		inst.bsdfData[2] = 0;
 		scene->instanceData.push_back(inst);
 	}
 };
