@@ -43,6 +43,8 @@ cbuffer CBuffer : register(b0)
     uint nLights;
     float SPP;
     uint useEnvironmentMap;
+    float3 lightPosition;
+    float _padLight;
 };
 
 // Acceleration structure for raytracing the scene
@@ -592,9 +594,15 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
     // Compute hit data using the intersection attributes
     HitData hitData = calculateHitData(attrib);
 
+    // Sample the sprite colour
     uint texID = hitData.instance.bsdfAlbedoID & 0xffff;
-    payload.colour = textures[texID].SampleLevel(samplerState, hitData.uv, 0).rgb;
+    float3 spriteColour = textures[texID].SampleLevel(samplerState, hitData.uv, 0).rgb;
+
+    bool lit = visible(hitData.pos, lightPosition);
+    payload.colour = spriteColour * (lit ? 1.0f : 0.4f);
     return;
+
+    /* ---- - OLD CODE------
 
     // If the hit object is a light and it's the first bounce, return its emitted light
     if (isLight(hitData) && (payload.depth == 0 || decodeIsSpecular(payload.flags)))
@@ -657,6 +665,8 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
 
     // Trace the indirect ray
     TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
+
+    */
 }
 
 [shader("anyhit")]

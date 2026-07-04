@@ -91,13 +91,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
     // Load Texture and retrive ID
     textures.load(&core, "Sprites/alienGreen_stand.png");
-    int texID = textures.find("Sprites/alienGreen_stand.png");
+    int spriteTexID = textures.find("Sprites/alienGreen_stand.png");
+    textures.load(&core, "Sprites/colored_grass.png");
+    int bgTexID = textures.find("Sprites/colored_grass.png");  
+    
+    //BG
+    Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -110.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID;
+    spriteSys.addSprite(&scene, bg);
 
     // Create sprites in the scene
-    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, 0.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = texID;
-    Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, 0.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = texID;
-    Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, 0.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = texID;
-    Sprite d; d.startPos = d.pos = Vec3(0.7f, 0.0f, -200.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = texID;
+    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -70.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID;
+    Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, -70.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID;
+    Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, -70.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID;
+    Sprite d; d.startPos = d.pos = Vec3(0.7f, 0.0f, -100.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID;
     spriteSys.addSprite(&scene, a);
     spriteSys.addSprite(&scene, b);
     spriteSys.addSprite(&scene, c);
@@ -109,6 +115,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Matrix V = Matrix::lookAt(Vec3(0.0f, 0.0f, 500.0f), Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
     camera.initView(V);
     camera.moveSpeed = 0.1f;
+
+    // Point light source
+    Vec3 lightPos = Vec3(3.0f, 1.0f, 2.0f);
+    shaders.updateConstant(shaderName, "CBuffer", "lightPosition", &lightPos);
 
     // Use a default black environment
     float env[3] = { 0, 0, 0 };
