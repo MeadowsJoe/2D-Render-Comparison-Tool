@@ -594,13 +594,35 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
     // Compute hit data using the intersection attributes
     HitData hitData = calculateHitData(attrib);
 
-    // Sample the sprite colour
-    uint texID = hitData.instance.bsdfAlbedoID & 0xffff;
-    float3 spriteColour = textures[texID].SampleLevel(samplerState, hitData.uv, 0).rgb;
+    // If specular
+    if (hitData.bsdf == 3)
+    {
+        if (payload.depth >= 4) { payload.colour = float3(0, 0, 0); return; }
+        payload.depth = payload.depth + 1;
 
-    bool lit = visible(hitData.pos, lightPosition);
-    payload.colour = spriteColour * (lit ? 1.0f : 0.4f);
-    return;
+        float3 r = reflect(WorldRayDirection(), hitData.normal);
+
+        RayDesc reflectRay;
+        reflectRay.Origin = hitData.pos + hitData.normal * 0.001;
+        reflectRay.Direction = r;
+        reflectRay.TMin = 0.001;
+        reflectRay.TMax = 1000;
+
+        TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, reflectRay, payload);
+        return;
+    }
+    else
+    {
+        // Sample the sprite colour
+        uint texID = hitData.instance.bsdfAlbedoID & 0xffff;
+        float3 spriteColour = textures[texID].SampleLevel(samplerState, hitData.uv, 0).rgb;
+
+        bool lit = visible(hitData.pos, lightPosition);
+        payload.colour = spriteColour * (lit ? 1.0f : 0.4f);
+        return;
+    }
+
+   
 
     /* ---- - OLD CODE------
 

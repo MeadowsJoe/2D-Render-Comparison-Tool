@@ -88,26 +88,54 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     // Initialize Sprite
     SpriteSystem spriteSys;
     spriteSys.init(&core, &scene);
-
-    // Load Texture and retrive ID
-    textures.load(&core, "Sprites/alienGreen_stand.png");
-    int spriteTexID = textures.find("Sprites/alienGreen_stand.png");
-    textures.load(&core, "Sprites/colored_grass.png");
-    int bgTexID = textures.find("Sprites/colored_grass.png");  
     
     //BG
-    Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -110.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID;
+    textures.load(&core, "Sprites/colored_desert.png");
+    int bgTexID = textures.find("Sprites/colored_desert.png");
+    Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
     spriteSys.addSprite(&scene, bg);
 
+    //BG offscreen
+    textures.load(&core, "Sprites/colored_grass.png");
+    int offBGTexID = textures.find("Sprites/colored_grass.png");
+    Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+    spriteSys.addSprite(&scene, offbg);
+
     // Create sprites in the scene
-    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -70.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID;
-    Sprite b; b.startPos = b.pos = Vec3(0.0f, 0.0f, -70.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID;
-    Sprite c; c.startPos = c.pos = Vec3(1.5f, 0.0f, -70.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID;
-    Sprite d; d.startPos = d.pos = Vec3(0.7f, 0.0f, -100.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID;
+    textures.load(&core, "Sprites/alienGreen_stand.png");
+    int spriteTexID = textures.find("Sprites/alienGreen_stand.png");
+    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -50.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID, a.role = Occluder;
+    Sprite b; b.startPos = b.pos = Vec3(-0.5f, 0.0f, -50.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID, b.role = Occluder;
+    Sprite c; c.startPos = c.pos = Vec3(0.5f, 0.0f, -50.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID, c.role = Occluder;
+    Sprite d; d.startPos = d.pos = Vec3(1.5f, 0.0f, -50.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID, d.role = Occluder;
     spriteSys.addSprite(&scene, a);
     spriteSys.addSprite(&scene, b);
     spriteSys.addSprite(&scene, c);
     spriteSys.addSprite(&scene, d);
+
+    // Color source
+    textures.load(&core, "Sprites/gemRed.png");
+    int colourTexID = textures.find("Sprites/gemRed.png");
+    Sprite col; col.startPos = col.pos = Vec3(-3.0f, 0.0f, -55.0f); col.w = 1.0f; col.h = 1.0f; col.textureID = colourTexID; col.role = Colour;
+    spriteSys.addSprite(&scene, col);
+
+    // Mirror object
+    textures.load(&core, "Sprites/mirror.png");
+    int mirrorTexID = textures.find("Sprites/mirror.png");
+    Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+    spriteSys.addSprite(&scene, mir);
+
+    // Off screen Occluder
+    textures.load(&core, "Sprites/alienPink_stand.png");
+    int ofOccTexID = textures.find("Sprites/alienPink_stand.png");
+    Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 900.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = Mirror;
+    spriteSys.addSprite(&scene, ofOcc);
+
+    // Off screen object
+    textures.load(&core, "Sprites/keyYellow.png");
+    int ofObjTexID = textures.find("Sprites/keyYellow.png");
+    Sprite ofObj; ofObj.startPos = ofObj.pos = Vec3(4.5f, 0.0f, 100.0f); ofObj.w = 1.0f; ofObj.h = 1.0f; ofObj.textureID = ofObjTexID; ofObj.role = Mirror;
+    spriteSys.addSprite(&scene, ofObj);
 
     // Camera Setup
     Matrix P = Matrix::perspective(0.1f, 100.0f, (float)width / (float)height, 1.0f);
@@ -117,7 +145,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     camera.moveSpeed = 0.1f;
 
     // Point light source
-    Vec3 lightPos = Vec3(3.0f, 1.0f, 2.0f);
+    Vec3 lightPos = Vec3(10.0f, 1.0f, 900.0f);
     shaders.updateConstant(shaderName, "CBuffer", "lightPosition", &lightPos);
 
     // Use a default black environment

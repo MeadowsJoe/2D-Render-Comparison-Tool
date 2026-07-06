@@ -65,6 +65,7 @@ void updateTLAS(Core* core, Scene* scene)
 	core->graphicsCommandList->ResourceBarrier(1, &barrier);
 }
 
+enum Role { OFobject, OFoccluder, Colour, Mirror, Occluder, Background };
 
 struct Sprite
 {
@@ -72,6 +73,8 @@ struct Sprite
 	Vec3 pos;
 	float w, h;
 	int textureID;
+	Role role;
+	int bsdfType = 0; // 0 = normal, 3 = mirror
 };
 
 class SpriteSystem
@@ -115,11 +118,27 @@ public:
 	{
 		for (int i = 0; i < sprites.size(); i ++)
 		{
-			sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
+			switch (sprites[i].role) {
+			case OFobject:
+				break;
+			case OFoccluder:
+				break;
+			case Colour:
+				break;
+			case Mirror:
+				break;
+			case Occluder:
+			{
+				sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
 
-			TLASTransform tr = makeTranform(sprites[i].pos, sprites[i].w, sprites[i].h);
+				TLASTransform tr = makeTranform(sprites[i].pos, sprites[i].w, sprites[i].h);
 
-			scene->transforms[i] = tr;
+				scene->transforms[i] = tr;
+			}
+				break;
+			case Background:
+				break;
+			}
 		}
 	}
 
@@ -135,6 +154,7 @@ public:
 
 		InstanceData inst;
 		inst.updatetextureID(s.textureID);
+		inst.updateBSDFType(s.bsdfType);
 		inst.startIndex = scene->indexOffset[key];
 		scene->instanceData.push_back(inst);
 	}
