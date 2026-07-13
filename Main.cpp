@@ -31,6 +31,7 @@ SOFTWARE.
 #include "Graphics/GEMLoader.h"
 #include "Graphics/RTSceneLoader.h"
 #include "Graphics/Sprites.h"
+#include "Graphics/PerfLogger.h"
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -113,12 +114,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     spriteSys.addSprite(&scene, c);
     spriteSys.addSprite(&scene, d);
 
-    // Color source
-    textures.load(&core, "Sprites/gemRed.png");
-    int colourTexID = textures.find("Sprites/gemRed.png");
-    Sprite col; col.startPos = col.pos = Vec3(-3.0f, 0.0f, -55.0f); col.w = 1.0f; col.h = 1.0f; col.textureID = colourTexID; col.role = Colour;
-    spriteSys.addSprite(&scene, col);
-
     // Mirror object
     textures.load(&core, "Sprites/mirror.png");
     int mirrorTexID = textures.find("Sprites/mirror.png");
@@ -128,7 +123,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     // Off screen Occluder
     textures.load(&core, "Sprites/alienPink_stand.png");
     int ofOccTexID = textures.find("Sprites/alienPink_stand.png");
-    Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 900.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = Mirror;
+    Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = Mirror;
     spriteSys.addSprite(&scene, ofOcc);
 
     // Off screen object
@@ -145,8 +140,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     camera.moveSpeed = 0.1f;
 
     // Point light source
-    Vec3 lightPos = Vec3(10.0f, 1.0f, 900.0f);
+    Vec3 lightPos = Vec3(10.0f, 1.0f, 600.0f);
+    unsigned int shadowSamples = 64;
     shaders.updateConstant(shaderName, "CBuffer", "lightPosition", &lightPos);
+    shaders.updateConstant(shaderName, "CBuffer", "shadowSamples", &shadowSamples);
 
     // Use a default black environment
     float env[3] = { 0, 0, 0 };
@@ -169,6 +166,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     float t = 0;         // Total elapsed time
     unsigned int SPP = 0; // Samples per pixel counter
 
+    float dtSmoothed = 0.016f;
+
+    // Performance log
+    PerfLogger perf;
+    Params params;
+    int caputreFrame = 0;
+
+    bool logStarted = false;
+
     // Main loop
     while (running)
     {
@@ -176,29 +182,37 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         win.checkInput();
         float dt = timer.dt();  // Delta time for this frame
 
+        dtSmoothed = dtSmoothed * 0.95f + dt * 0.05f;
+        float ms = dtSmoothed * 1000.0f;
+        float fps = 1.0f / dtSmoothed;
+
+        char buf[64];
+        sprintf_s(buf, "2D RT - %.1f FPS (%.2f ms)", fps, ms);
+        SetWindowTextA(win.hwnd, buf);
+
         // Camera movement controls
-        if (win.keyPressed('W'))
+        if (win.keyPressed('W') && !logStarted)
         {
             camera.moveForward();
             SPP = 0;
         }
-        if (win.keyPressed('S'))
+        if (win.keyPressed('S') && !logStarted)
         {
             camera.moveBackward();
             SPP = 0;
         }
-        if (win.keyPressed('A'))
+        if (win.keyPressed('A') && !logStarted)
         {
             camera.moveLeft();
             SPP = 0;
         }
-        if (win.keyPressed('D'))
+        if (win.keyPressed('D') && !logStarted)
         {
             camera.moveRight();
             SPP = 0;
         }
         // Camera orientation control using mouse input
-        if (win.mouseButtons[0] == true)
+        if (win.mouseButtons[0] == true && !logStarted)
         {
             float dx = (float)win.mousedx;
             float dy = (float)win.mousedy;
@@ -229,17 +243,39 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         shaders.apply(&core, shaderName);
         core.bindRTUAV();
 
-        spriteSys.update(&scene, t);
+        if(!logStarted)
+            spriteSys.update(&scene, t);
         updateTLAS(&core, &scene);
 
         // Reapply shader and render the scene
         shaders.apply(&core, shaderName);
         scene.draw(&core);
 
+        // Record performance
+        if (win.keyPressed('C') && !logStarted)
+        {
+            logStarted = true;
+            caputreFrame = 0;
+            perf.open();
+        }
+        if (caputreFrame < 1000 && logStarted)
+        {
+            caputreFrame++;
+
+            params.nSprites = spriteSys.sprites.size(); params.nSamples = shadowSamples; params.nLights = 1;
+            perf.log(dt * 1000, caputreFrame, params);
+            if (caputreFrame == 999)
+            {
+                logStarted = false;
+                perf.close();
+            }
+        }
+
         // Finish and present the frame
         core.finishFrame();
     }
-    core.flushGraphicsQueue();
 
+    core.flushGraphicsQueue();
+   
     return 0;
 }

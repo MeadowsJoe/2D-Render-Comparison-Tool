@@ -45,6 +45,7 @@ cbuffer CBuffer : register(b0)
     uint useEnvironmentMap;
     float3 lightPosition;
     float _padLight;
+    uint shadowSamples;
 };
 
 // Acceleration structure for raytracing the scene
@@ -617,8 +618,19 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
         uint texID = hitData.instance.bsdfAlbedoID & 0xffff;
         float3 spriteColour = textures[texID].SampleLevel(samplerState, hitData.uv, 0).rgb;
 
-        bool lit = visible(hitData.pos, lightPosition);
-        payload.colour = spriteColour * (lit ? 1.0f : 0.4f);
+        float lightRadius = 0.4f;
+        float litCount = 0.0f;
+
+        for (int i = 0; i < shadowSamples; i++)
+        {
+            float3 offset = uniformSampleSphere(rnd(payload.rndState), rnd(payload.rndState)) * lightRadius;
+            float3 samplePos = lightPosition + offset;
+
+            if (visible(hitData.pos, samplePos)) litCount += 1.0f;
+        }
+
+        float shadow = litCount / (float)shadowSamples;
+        payload.colour = spriteColour * lerp(0.5f, 1.0f, shadow);
         return;
     }
 

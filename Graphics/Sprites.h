@@ -65,7 +65,7 @@ void updateTLAS(Core* core, Scene* scene)
 	core->graphicsCommandList->ResourceBarrier(1, &barrier);
 }
 
-enum Role { OFobject, OFoccluder, Colour, Mirror, Occluder, Background };
+enum Role { OFobject, OFoccluder, Mirror, Occluder, Background };
 
 struct Sprite
 {
@@ -122,8 +122,6 @@ public:
 			case OFobject:
 				break;
 			case OFoccluder:
-				break;
-			case Colour:
 				break;
 			case Mirror:
 				break;

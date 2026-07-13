@@ -45,6 +45,9 @@
     <ClInclude Include="Sprites.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="PerfLogger.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Graphics">
