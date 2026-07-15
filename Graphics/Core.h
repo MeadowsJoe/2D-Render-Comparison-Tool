@@ -140,6 +140,9 @@ public:
     int height;
     HWND windowHandle;
 
+    ID3D12DescriptorHeap* rtvHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
+
     // Initializes the Direct3D device, command queues, swap chain, and related resources
     void init(HWND hwnd, int _width, int _height)
     {
@@ -259,7 +262,7 @@ public:
         rtDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         rtDesc.SampleDesc.Count = 1;
         rtDesc.SampleDesc.Quality = 0;
-        rtDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        rtDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
         device->CreateCommittedResource(&heapDesc, D3D12_HEAP_FLAG_NONE, &rtDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&rendertarget));
 
         // Create an unordered access view (UAV) for the render target
@@ -267,6 +270,12 @@ public:
         uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
         device->CreateUnorderedAccessView(rendertarget, nullptr, &uavDesc, uavsrvHeap.getNextCPUHandle());
+
+        //create an unordered render target view (RTV)
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(rendertarget, &rtvDesc, rtvHandle);
     }
 
     // Creates the root signature for the pipeline
@@ -403,6 +412,16 @@ public:
 
         // Optionally, set the root signature on the command list:
         // graphicsCommandList->SetComputeRootSignature(rootSignature);
+    }
+
+    // Create RTV heap for raster pipeline
+    void createRTVHeap()
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC rtvDesc = {};
+        rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rtvDesc.NumDescriptors = 1;
+        device->CreateDescriptorHeap(&rtvDesc, IID_PPV_ARGS(&rtvHeap));
+        rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
     }
 
     // Resets the command list for recording new commands

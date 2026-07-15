@@ -42,10 +42,13 @@
     <ClInclude Include="Graphics\Window.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Sprites.h">
+    <ClInclude Include="Graphics\PerfLogger.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="PerfLogger.h">
+    <ClInclude Include="Graphics\Sprites.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Raster.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
@@ -56,5 +59,10 @@
     <Filter Include="Source Files">
       <UniqueIdentifier>{cf125c9a-7dd2-426f-89ce-49e04e76a4d6}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Sprite.hlsl">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
