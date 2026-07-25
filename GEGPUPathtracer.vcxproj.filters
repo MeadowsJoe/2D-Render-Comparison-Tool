@@ -61,7 +61,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Sprite.hlsl">
+    <None Include="RTSprite.hlsl">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="RasSprite.hlsl">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

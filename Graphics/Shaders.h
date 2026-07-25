@@ -501,6 +501,57 @@ public:
         shaders.insert({ filename, shader });
     }
 
+    IDxcBlob* compileGraphicsShader(std::string filename, const wchar_t* entryPoint, const wchar_t* profile)
+    {
+        IDxcBlobEncoding* source;
+        std::wstring wfilename(filename.begin(), filename.end());
+        HRESULT hr = utils->LoadFile(wfilename.c_str(), NULL, &source);
+        if (FAILED(hr))
+        {
+            MessageBoxA(NULL, "Couldn't find HLSL file", "Error", 0);
+            exit(0);
+        }
+
+        // Set shader compilation arguments (targeting library profile)
+        const wchar_t* args[] =
+        {
+            L"-T", profile, L"-E", entryPoint
+        };
+
+        DxcBuffer sourceBuffer;
+        sourceBuffer.Ptr = source->GetBufferPointer();
+        sourceBuffer.Size = source->GetBufferSize();
+        sourceBuffer.Encoding = 0;
+
+        // Compile the shader source code
+        IDxcOperationResult* res;
+        hr = compiler->Compile(&sourceBuffer, args, 4, includeHandler, IID_PPV_ARGS(&res));
+        if (FAILED(hr))
+        {
+            if (res)
+            {
+                IDxcBlobEncoding* errors;
+                res->GetErrorBuffer(&errors);
+                MessageBoxA(NULL, (const char*)errors->GetBufferPointer(), "Compilation Error", 0);
+                exit(0);
+            }
+        }
+        res->GetStatus(&hr);
+        if (FAILED(hr))
+        {
+            if (res)
+            {
+                IDxcBlobEncoding* errors;
+                res->GetErrorBuffer(&errors);
+                MessageBoxA(NULL, (const char*)errors->GetBufferPointer(), "Compilation Error", 0);
+                exit(0);
+            }
+        }
+        IDxcBlob* code;
+        res->GetResult(&code);
+        return code;
+    }
+
     // Find a loaded shader by filename.
     RTShader* find(std::string filename)
     {

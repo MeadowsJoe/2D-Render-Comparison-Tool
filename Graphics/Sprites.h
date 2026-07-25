@@ -65,7 +65,19 @@ void updateTLAS(Core* core, Scene* scene)
 	core->graphicsCommandList->ResourceBarrier(1, &barrier);
 }
 
-enum Role { OFobject, OFoccluder, Mirror, Occluder, Background };
+enum Role { OFoccluder, Mirror, Occluder, Background };
+
+
+inline ThreeFourTransform makeTransform(Vec3 pos, float w, float h)
+{
+	ThreeFourTransform t;
+
+	t.w[0][0] = w; t.w[0][1] = 0.0f;   t.w[0][2] = 0.0f; t.w[0][3] = pos.x;
+	t.w[1][0] = 0.0f;  t.w[1][1] = h; t.w[1][2] = 0.0f; t.w[1][3] = pos.y;
+	t.w[2][0] = 0.0f;  t.w[2][1] = 0.0f;   t.w[2][2] = 1.0f; t.w[2][3] = pos.z;
+
+	return t;
+}
 
 struct Sprite
 {
@@ -84,16 +96,6 @@ public:
 	std::string key;
 	std::vector<Sprite> sprites;
 
-	TLASTransform makeTranform(Vec3 pos, float w, float h)
-	{
-		TLASTransform t;
-
-		t.w[0][0] = w; t.w[0][1] = 0.0f;   t.w[0][2] = 0.0f; t.w[0][3] = pos.x;
-		t.w[1][0] = 0.0f;  t.w[1][1] = h; t.w[1][2] = 0.0f; t.w[1][3] = pos.y;
-		t.w[2][0] = 0.0f;  t.w[2][1] = 0.0f;   t.w[2][2] = 1.0f; t.w[2][3] = pos.z;
-
-		return t;
-	}
 
 	// Create shared quad
 	// Store in global buffers
@@ -119,8 +121,6 @@ public:
 		for (int i = 0; i < sprites.size(); i ++)
 		{
 			switch (sprites[i].role) {
-			case OFobject:
-				break;
 			case OFoccluder:
 				break;
 			case Mirror:
@@ -129,7 +129,7 @@ public:
 			{
 				sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
 
-				TLASTransform tr = makeTranform(sprites[i].pos, sprites[i].w, sprites[i].h);
+				ThreeFourTransform tr = makeTransform(sprites[i].pos, sprites[i].w, sprites[i].h);
 
 				scene->transforms[i] = tr;
 			}
@@ -145,7 +145,7 @@ public:
 	{
 		sprites.push_back(s);
 		
-		TLASTransform t = makeTranform(s.pos, s.w, s.h);
+		ThreeFourTransform t = makeTransform(s.pos, s.w, s.h);
 
 		scene->meshes.push_back(quad);
 		scene->transforms.push_back(t);

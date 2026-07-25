@@ -32,50 +32,24 @@ SOFTWARE.
 #include "Graphics/RTSceneLoader.h"
 #include "Graphics/Sprites.h"
 #include "Graphics/PerfLogger.h"
+#include "Graphics/Raster.h"
+
+enum class RenderMode { RayTracing, Raster };
+constexpr RenderMode ACTIVE_MODE = RenderMode::RayTracing;
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-    // Define the scene to load.
-    std::string sceneName = "cornell-box";
-    // std::string sceneName = "bathroom";
-    // std::string sceneName = "bathroom2";
-    // std::string sceneName = "bedroom";
-    // std::string sceneName = "car2";
-    // std::string sceneName = "classroom";
-    // std::string sceneName = "coffee";
-    // std::string sceneName = "dining-room";
-    // std::string sceneName = "glass-of-water";
-    // std::string sceneName = "house";
-    // std::string sceneName = "kitchen";
-    // std::string sceneName = "living-room";
-    // std::string sceneName = "living-room-2";
-    // std::string sceneName = "living-room-3";
-    // std::string sceneName = "MaterialsScene";
-    // std::string sceneName = "Sibenik";
-    // std::string sceneName = "staircase";
-    // std::string sceneName = "staircase2";
-    // std::string sceneName = "teapot-full";
-    // std::string sceneName = "Terrain";
-    // std::string sceneName = "veach-bidir";
-    // std::string sceneName = "veach-mis";
-
     // Retrieve the scene dimensions
-    int width = 0;
-    int height = 0;
-    loadWidthAndHeight(sceneName, width, height);
+    int width = 1024;
+    int height = 1024;
 
     // Create the application window
     Window win;
-    win.create(width, height, "GEGPUPathtracer");
+    win.create(width, height, "GEGPURenderer");
 
-    // Initialize core graphics and shaders
-    std::string shaderName = "Sprite.hlsl";
+    // Initialize core graphics
     Core core;
     core.init(win.hwnd, width, height);
-
-    Shaders shaders;
-    shaders.init(&core);
-    shaders.load(&core, shaderName);
 
     // Initialize scene, textures, and camera
     Scene scene;
@@ -83,24 +57,35 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Textures textures;
     Camera camera;
 
+    // Initialise shaders and sprites
+    Shaders shaders;
+    std::string shaderName = "RTSprite.hlsl";
+    shaders.init(&core);
+
+    SpriteSystem spriteSys;
+    RasterSystem rasterSys;
+    if (ACTIVE_MODE == RenderMode::RayTracing)
+    {
+        shaders.load(&core, shaderName);
+        spriteSys.init(&core, &scene);
+    }
+    else
+    {
+        rasterSys.init(&core, &shaders);
+    }
+   
     // Load and build the scene
     scene.reset();
-    //loadScene(&core, &scene, &textures, &camera, sceneName); // Replaced by initQuad
-    // Initialize Sprite
-    SpriteSystem spriteSys;
-    spriteSys.init(&core, &scene);
     
     //BG
     textures.load(&core, "Sprites/colored_desert.png");
     int bgTexID = textures.find("Sprites/colored_desert.png");
     Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
-    spriteSys.addSprite(&scene, bg);
 
     //BG offscreen
     textures.load(&core, "Sprites/colored_grass.png");
     int offBGTexID = textures.find("Sprites/colored_grass.png");
     Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
-    spriteSys.addSprite(&scene, offbg);
 
     // Create sprites in the scene
     textures.load(&core, "Sprites/alienGreen_stand.png");
@@ -109,31 +94,42 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Sprite b; b.startPos = b.pos = Vec3(-0.5f, 0.0f, -50.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID, b.role = Occluder;
     Sprite c; c.startPos = c.pos = Vec3(0.5f, 0.0f, -50.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID, c.role = Occluder;
     Sprite d; d.startPos = d.pos = Vec3(1.5f, 0.0f, -50.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID, d.role = Occluder;
-    spriteSys.addSprite(&scene, a);
-    spriteSys.addSprite(&scene, b);
-    spriteSys.addSprite(&scene, c);
-    spriteSys.addSprite(&scene, d);
-
+    
     // Mirror object
     textures.load(&core, "Sprites/mirror.png");
     int mirrorTexID = textures.find("Sprites/mirror.png");
     Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
-    spriteSys.addSprite(&scene, mir);
 
     // Off screen Occluder
     textures.load(&core, "Sprites/alienPink_stand.png");
     int ofOccTexID = textures.find("Sprites/alienPink_stand.png");
-    Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = Mirror;
-    spriteSys.addSprite(&scene, ofOcc);
+    Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = OFoccluder;
 
-    // Off screen object
-    textures.load(&core, "Sprites/keyYellow.png");
-    int ofObjTexID = textures.find("Sprites/keyYellow.png");
-    Sprite ofObj; ofObj.startPos = ofObj.pos = Vec3(4.5f, 0.0f, 100.0f); ofObj.w = 1.0f; ofObj.h = 1.0f; ofObj.textureID = ofObjTexID; ofObj.role = Mirror;
-    spriteSys.addSprite(&scene, ofObj);
+    if (ACTIVE_MODE == RenderMode::RayTracing)
+    {
+        spriteSys.addSprite(&scene, bg);
+        spriteSys.addSprite(&scene, offbg);
+        spriteSys.addSprite(&scene, a);
+        spriteSys.addSprite(&scene, b);
+        spriteSys.addSprite(&scene, c);
+        spriteSys.addSprite(&scene, d);
+        spriteSys.addSprite(&scene, mir);
+        spriteSys.addSprite(&scene, ofOcc);
+    }
+    else
+    {
+        rasterSys.sprites.push_back(bg);
+        rasterSys.sprites.push_back(offbg);
+        rasterSys.sprites.push_back(a);
+        rasterSys.sprites.push_back(b);
+        rasterSys.sprites.push_back(c);
+        rasterSys.sprites.push_back(d);
+        rasterSys.sprites.push_back(mir);
+        rasterSys.sprites.push_back(ofOcc);
+    }
 
     // Camera Setup
-    Matrix P = Matrix::perspective(0.1f, 100.0f, (float)width / (float)height, 1.0f);
+    Matrix P = Matrix::perspective(0.1f, 1000.0f, (float)width / (float)height, 1.0f);
     camera.init(P, width, height);
     Matrix V = Matrix::lookAt(Vec3(0.0f, 0.0f, 500.0f), Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
     camera.initView(V);
@@ -145,20 +141,23 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     shaders.updateConstant(shaderName, "CBuffer", "lightPosition", &lightPos);
     shaders.updateConstant(shaderName, "CBuffer", "shadowSamples", &shadowSamples);
 
-    // Use a default black environment
-    float env[3] = { 0, 0, 0 };
-    scene.environmentMap = textures.loadFromMemory(&core, 1, 1, 3, env);
-    scene.envLum = 0;
-    scene.build(&core);
+    if (ACTIVE_MODE == RenderMode::RayTracing)
+    {
+        // Use a default black environment
+        float env[3] = { 0, 0, 0 };
+        scene.environmentMap = textures.loadFromMemory(&core, 1, 1, 3, env);
+        scene.envLum = 0;
+        scene.build(&core);
 
-    // Update scene drawing information with the current shader
-    scene.updateDrawInfo(&core, shaders.find(shaderName));
+        // Update scene drawing information with the current shader
+        scene.updateDrawInfo(&core, shaders.find(shaderName));
 
-    // Update shader constants for lighting and environment settings
-    unsigned int nLights = (unsigned int)scene.lights.size();
-    shaders.updateConstant(shaderName, "CBuffer", "nLights", &nLights);
-    unsigned int useEnv = scene.envLum > 0 ? 1 : 0;
-    shaders.updateConstant(shaderName, "CBuffer", "useEnvironmentMap", &useEnv);
+        // Update shader constants for lighting and environment settings
+        unsigned int nLights = (unsigned int)scene.lights.size();
+        shaders.updateConstant(shaderName, "CBuffer", "nLights", &nLights);
+        unsigned int useEnv = scene.envLum > 0 ? 1 : 0;
+        shaders.updateConstant(shaderName, "CBuffer", "useEnvironmentMap", &useEnv);
+    }
 
     // Set up timer and initialize control variables
     Timer timer;
@@ -230,26 +229,37 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         // Update time
         t += dt;
 
-        // Update shader constants with current camera matrices
-        shaders.updateConstant(shaderName, "CBuffer", "inverseView", &camera.inverseView);
-        shaders.updateConstant(shaderName, "CBuffer", "inverseProjection", &camera.inverseProjection);
+        if (ACTIVE_MODE == RenderMode::RayTracing)
+        {
+            if (!logStarted)
+                spriteSys.update(&scene, t);
+            updateTLAS(&core, &scene);
 
-        // Update samples per pixel counter and pass it to the shader
-        SPP++;
-        float SPPf = static_cast<float>(SPP);
-        shaders.updateConstant(shaderName, "CBuffer", "SPP", &SPPf);
+            // Update shader constants with current camera matrices
+            shaders.updateConstant(shaderName, "CBuffer", "inverseView", &camera.inverseView);
+            shaders.updateConstant(shaderName, "CBuffer", "inverseProjection", &camera.inverseProjection);
 
-        // Apply shader changes and bind resources for the render target
-        shaders.apply(&core, shaderName);
-        core.bindRTUAV();
+            // Update samples per pixel counter and pass it to the shader
+            SPP++;
+            float SPPf = static_cast<float>(SPP);
+            shaders.updateConstant(shaderName, "CBuffer", "SPP", &SPPf);
 
-        if(!logStarted)
-            spriteSys.update(&scene, t);
-        updateTLAS(&core, &scene);
+            // Apply shader changes and bind resources for the render target
+            shaders.apply(&core, shaderName);
+            core.bindRTUAV();
 
-        // Reapply shader and render the scene
-        shaders.apply(&core, shaderName);
-        scene.draw(&core);
+            // Reapply shader and render the scene
+            shaders.apply(&core, shaderName);
+            scene.draw(&core);
+        }
+        else
+        {
+            if (!logStarted)
+                rasterSys.update(t);
+            rasterSys.uploadInstanceBuffer(&core);
+            rasterSys.updateCameraBuffer(&camera);
+            rasterSys.draw(&core);
+        }
 
         // Record performance
         if (win.keyPressed('C') && !logStarted)
@@ -262,7 +272,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         {
             caputreFrame++;
 
-            params.nSprites = spriteSys.sprites.size(); params.nSamples = shadowSamples; params.nLights = 1;
+            params.nSprites = (ACTIVE_MODE == RenderMode::RayTracing) ? spriteSys.sprites.size() : rasterSys.sprites.size(); 
+            params.nSamples = shadowSamples; 
+            params.nLights = 1;
             perf.log(dt * 1000, caputreFrame, params);
             if (caputreFrame == 999)
             {

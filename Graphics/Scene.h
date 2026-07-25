@@ -222,7 +222,7 @@ public:
 };
 
 // Wrapper class for storing a 3x4 transformation matrix used in TLAS.
-class TLASTransform
+class ThreeFourTransform
 {
 public:
     union
@@ -231,12 +231,12 @@ public:
         float a[12];   // Flat array representation (alternative)
     };
 
-    TLASTransform()
+    ThreeFourTransform()
     {
     }
 
     // Construct TLASTransform from a Matrix object (copies 12 floats)
-    TLASTransform(const Matrix& m)
+    ThreeFourTransform(const Matrix& m)
     {
         memcpy(a, m.m, sizeof(float) * 12);
     }
@@ -270,7 +270,7 @@ public:
 
     // Mesh pointers and their transforms
     std::vector<Mesh*> meshes;
-    std::vector<TLASTransform> transforms;
+    std::vector<ThreeFourTransform> transforms;
 
     // Dispatch description for ray tracing
     D3D12_DISPATCH_RAYS_DESC dispatchDesc;
@@ -392,7 +392,7 @@ public:
     void addMesh(Mesh* mesh, const Matrix& transform)
     {
         meshes.push_back(mesh);
-        transforms.push_back(TLASTransform(transform));
+        transforms.push_back(ThreeFourTransform(transform));
     }
 
     // Build the TLAS and initialize structured buffers for rendering.

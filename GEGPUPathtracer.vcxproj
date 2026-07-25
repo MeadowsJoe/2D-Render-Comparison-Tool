@@ -148,7 +148,12 @@
     <ClInclude Include="Graphics\Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Sprite.hlsl">
+    <None Include="RTSprite.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="RasSprite.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

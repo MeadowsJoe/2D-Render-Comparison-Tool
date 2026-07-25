@@ -220,6 +220,7 @@ public:
         rendertarget = nullptr;
 
         // Update screen resources based on the given width and height
+        createRTVHeap();
         updateScreenResources(_width, _height);
 
         // Create the command allocator and command list

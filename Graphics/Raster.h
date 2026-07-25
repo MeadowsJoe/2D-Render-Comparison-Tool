@@ -4,8 +4,9 @@
 #include "Core.h"
 #include "Scene.h"
 #include "Texture.h"
-#include "Math.h"
 #include "Sprites.h"
+#include "Camera.h"
+#include "Shaders.h"
 
 #include <vector>
 #include <string>
@@ -13,9 +14,14 @@
 
 struct RasterInstanceData
 {
-	float3x4 transform;
-	uint textureID;
-	uint pad[3];
+	ThreeFourTransform transform;
+	unsigned int textureID;
+	unsigned int pad[3];
+};
+
+struct CameraCB
+{
+	Matrix viewProj;
 };
 
 class RasterSystem
@@ -26,25 +32,41 @@ public:
 	ID3D12Resource* depthBuffer;
 	ID3D12DescriptorHeap* dsvHeap;
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle;
-	ID3D12Resource* instanceBufferRing[FRAMES_IN_FLIGHT];
-	void* mappedPtr[FRAMES_IN_FLIGHT];
+	ID3D12Resource* instanceBuffer;
+	void* mappedPtr;
 	ID3D12Resource* quadVertexBuffer;
 	ID3D12Resource* quadIndexBuffer;
 	D3D12_VERTEX_BUFFER_VIEW quadVBV;
 	D3D12_INDEX_BUFFER_VIEW quadIBV;
 	int instanceCount;
 	int quadIndexCount;
+	int maxInstances = 32;
+	D3D12_GPU_DESCRIPTOR_HANDLE ibHandle;
 
-	void init(Core* core)
+	// Camera
+	ID3D12Resource* cameraBuffer;
+	void* cameraMappedPtr;
+	D3D12_GPU_VIRTUAL_ADDRESS cameraCBV;
+	D3D12_VIEWPORT viewport;
+	D3D12_RECT scissorRect;
+	
+	const FLOAT bgColor[4]{ 0.0f, 0.0f, 0.0f, 1.0f };
+	std::vector<Sprite> sprites;
+
+	void init(Core* core, Shaders* shaders)
 	{
-		createDepthBuffer(core);
+		createDepthBuffer(core); // need onResize() path for adapting to screen size changes
 		createRootSignature(core);
 		createQuadBuffers(core);
+		IDxcBlob* vsBlob = shaders->compileGraphicsShader("RasSprite.hlsl", L"VSMain", L"vs_6_3");
+		IDxcBlob* psBlob = shaders->compileGraphicsShader("RasSprite.hlsl", L"PSMain", L"ps_6_3");
 		createPSO(core, vsBlob, psBlob);
 		createInstanceBuffers(core, maxInstances);
+		createViewport(core); // need onResize() path for adapting to screen size changes
+		createCameraBuffer(core);
 	}
 
-	void createDepthBuffer(Core* core)
+	void createDepthBuffer(Core* core) 
 	{
 		D3D12_RESOURCE_DESC depthDesc = {};
 		depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -73,7 +95,8 @@ public:
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 		dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
 		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-		core->device->CreateDepthStencilView(depthBuffer, &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+		dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+		core->device->CreateDepthStencilView(depthBuffer, &dsvDesc, dsvHandle);
 	}
 
 	void createRootSignature(Core* core) {
@@ -112,7 +135,7 @@ public:
 		desc.pParameters = params;
 		desc.NumStaticSamplers = 1;
 		desc.pStaticSamplers = &sampler;
-		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 		ID3DBlob* blob;
 		ID3DBlob* error;
@@ -121,7 +144,7 @@ public:
 		blob->Release();
 	}
 
-	void createPSO(Core* core, ID3DBlob* vsBlob, ID3DBlob* psBlob)
+	void createPSO(Core* core, IDxcBlob* vsBlob, IDxcBlob* psBlob)
 	{
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.pRootSignature = rootSignature;
@@ -129,16 +152,16 @@ public:
 		psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
 
 		D3D12_INPUT_ELEMENT_DESC layout[] = {
-			{ "position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "normal",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "tangent",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "uv", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		psoDesc.InputLayout = { layout, _countof(layout)};
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-		psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+		psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 		psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
 		psoDesc.RasterizerState.DepthClipEnable = TRUE;
@@ -231,11 +254,156 @@ public:
 
 	void uploadInstanceBuffer(Core*)
 	{
+		std::vector<RasterInstanceData> frameArray;
+		frameArray.resize(sprites.size());
+		for (int i = 0; i < frameArray.size(); i++)
+		{
+			frameArray[i].transform = makeTransform(sprites[i].pos, sprites[i].w, sprites[i].h);
+			frameArray[i].textureID = sprites[i].textureID;
+		}
 
+		memcpy(mappedPtr, frameArray.data(), frameArray.size() * sizeof(RasterInstanceData));
+		instanceCount = sprites.size();
 	}
 
-	void draw(Core*)
+	void createInstanceBuffers(Core* core, int maxInstances)
 	{
+		D3D12_RESOURCE_DESC bd = {};
+		bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		bd.Width = maxInstances * sizeof(RasterInstanceData);
+		bd.Height = 1;
+		bd.DepthOrArraySize = 1;
+		bd.MipLevels = 1;
+		bd.Format = DXGI_FORMAT_UNKNOWN;
+		bd.SampleDesc.Count = 1;
+		bd.SampleDesc.Quality = 0;
+		bd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		bd.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		D3D12_HEAP_PROPERTIES uploadHeapDesc = {};
+		uploadHeapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+		// Create an upload buffer
+		core->device->CreateCommittedResource(&uploadHeapDesc, D3D12_HEAP_FLAG_NONE, &bd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&instanceBuffer));
+
+		// Map and copy the data to the upload buffer
+		instanceBuffer->Map(0, nullptr, &mappedPtr);
+
+		// Create a shader resource view (SRV) for this buffer
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+		srvDesc.Buffer.FirstElement = 0;
+		srvDesc.Buffer.NumElements = maxInstances;
+		srvDesc.Buffer.StructureByteStride = sizeof(RasterInstanceData);
+		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE srv = core->uavsrvHeap.getNextCPUHandle();
+		int srvIndex = core->uavsrvHeap.used - 1;
+		ibHandle.ptr = core->uavsrvHeap.gpuHandle.ptr + srvIndex * core->uavsrvHeap.size;
+		core->device->CreateShaderResourceView(instanceBuffer, &srvDesc, srv);
+	}
+
+	void createCameraBuffer(Core* core)
+	{
+		D3D12_RESOURCE_DESC bd = {};
+		bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		bd.Width = sizeof(CameraCB);
+		bd.Height = 1;
+		bd.DepthOrArraySize = 1;
+		bd.MipLevels = 1;
+		bd.Format = DXGI_FORMAT_UNKNOWN;
+		bd.SampleDesc.Count = 1;
+		bd.SampleDesc.Quality = 0;
+		bd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		bd.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		D3D12_HEAP_PROPERTIES uploadHeapDesc = {};
+		uploadHeapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+		// Create an upload buffer
+		core->device->CreateCommittedResource(&uploadHeapDesc, D3D12_HEAP_FLAG_NONE, &bd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&cameraBuffer));
+
+		// Map and copy the data to the upload buffer
+		cameraBuffer->Map(0, nullptr, &cameraMappedPtr);
+
+		cameraCBV = cameraBuffer->GetGPUVirtualAddress();
+	}
+
+	void updateCameraBuffer(Camera* camera)
+	{
+		CameraCB camCB;
+		camCB.viewProj = (camera->view * camera->projection).transpose();
+		memcpy(cameraMappedPtr, &camCB, sizeof(CameraCB));
+	}
+
+	void createViewport(Core* core)
+	{
+		viewport.TopLeftX = 0.0f;
+		viewport.TopLeftY = 0.0f;
+		viewport.Width = (FLOAT)core->width;
+		viewport.Height = (FLOAT)core->height;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+
+		scissorRect.left = 0;
+		scissorRect.right = core->width;
+		scissorRect.top = 0;
+		scissorRect.bottom = core->height;
+	}
+
+	// Update triangles pos
+	void update(float t)
+	{
+		for (int i = 0; i < sprites.size(); i++)
+		{
+			switch (sprites[i].role) {
+			case OFoccluder:
+				break;
+			case Mirror:
+				break;
+			case Occluder:
+			{
+				sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
+			}
+			break;
+			case Background:
+				break;
+			}
+		}
+	}
+
+	void draw(Core* core)
+	{
+		
+		Barrier::add(core->rendertarget, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET, core->graphicsCommandList);
+	
+		core->graphicsCommandList->OMSetRenderTargets(1, &core->rtvHandle, FALSE, &dsvHandle);
+		core->graphicsCommandList->ClearRenderTargetView(core->rtvHandle, bgColor, 0, nullptr);
+		core->graphicsCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		core->graphicsCommandList->SetDescriptorHeaps(1, &core->uavsrvHeap.heap);
+		core->graphicsCommandList->SetPipelineState(pso);
+		core->graphicsCommandList->SetGraphicsRootSignature(rootSignature);
+
+		core->graphicsCommandList->SetGraphicsRootConstantBufferView(0, cameraCBV);
+		core->graphicsCommandList->SetGraphicsRootDescriptorTable(1, ibHandle);
+
+		UINT descriptorSize = core->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		D3D12_GPU_DESCRIPTOR_HANDLE textureGpuHandle = core->uavsrvHeap.gpuHandle;
+		textureGpuHandle.ptr += descriptorSize * 2;
+		core->graphicsCommandList->SetGraphicsRootDescriptorTable(2, textureGpuHandle);
+
+		core->graphicsCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		core->graphicsCommandList->IASetVertexBuffers(0, 1, &quadVBV);
+		core->graphicsCommandList->IASetIndexBuffer(&quadIBV);
+
+		core->graphicsCommandList->RSSetViewports(1, &viewport);
+		core->graphicsCommandList->RSSetScissorRects(1, &scissorRect);
+
+		core->graphicsCommandList->DrawIndexedInstanced(quadIndexCount, instanceCount, 0, 0, 0);
+
+		Barrier::add(core->rendertarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, core->graphicsCommandList);
 	}
 
 	~RasterSystem()
@@ -244,8 +412,8 @@ public:
 		if (rootSignature) rootSignature->Release();
 		if (depthBuffer) depthBuffer->Release();
 		if (dsvHeap) dsvHeap->Release();
-		for (int i = 0; i < FRAMES_IN_FLIGHT; i++)
-			if (instanceBufferRing[i]) instanceBufferRing[i]->Release();
+		if (instanceBuffer) instanceBuffer->Release();
+		if (cameraBuffer) cameraBuffer->Release();
 		if (quadVertexBuffer) quadVertexBuffer->Release();
 		if (quadIndexBuffer) quadIndexBuffer->Release();
 	}
