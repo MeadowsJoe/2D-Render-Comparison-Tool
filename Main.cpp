@@ -35,7 +35,7 @@ SOFTWARE.
 #include "Graphics/Raster.h"
 
 enum class RenderMode { RayTracing, Raster };
-constexpr RenderMode ACTIVE_MODE = RenderMode::RayTracing;
+constexpr RenderMode ACTIVE_MODE = RenderMode::Raster;
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -186,7 +186,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         float fps = 1.0f / dtSmoothed;
 
         char buf[64];
-        sprintf_s(buf, "2D RT - %.1f FPS (%.2f ms)", fps, ms);
+        if(ACTIVE_MODE == RenderMode::RayTracing) sprintf_s(buf, "2D RT - %.1f FPS (%.2f ms)", fps, ms);
+        else sprintf_s(buf, "2D Ras - %.1f FPS (%.2f ms)", fps, ms);
         SetWindowTextA(win.hwnd, buf);
 
         // Camera movement controls
@@ -262,11 +263,20 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         }
 
         // Record performance
-        if (win.keyPressed('C') && !logStarted)
+        if ((win.keyPressed('C') || (t >= 10 && t <= 11)) && !logStarted)
         {
             logStarted = true;
             caputreFrame = 0;
-            perf.open();
+            if (ACTIVE_MODE == RenderMode::RayTracing)
+            {
+                perf.open("RT");
+                perf.screenCapture(&core, "RT");
+            }
+            else
+            {
+                perf.open("Ras");
+                perf.screenCapture(&core,"Ras");
+            }
         }
         if (caputreFrame < 1000 && logStarted)
         {
@@ -276,7 +286,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
             params.nSamples = shadowSamples; 
             params.nLights = 1;
             perf.log(dt * 1000, caputreFrame, params);
-            if (caputreFrame == 999)
+            if (caputreFrame >= 999)
             {
                 logStarted = false;
                 perf.close();

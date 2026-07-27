@@ -28,7 +28,6 @@ SOFTWARE.
 #include "Core.h"
 #include <string>
 #include <map>
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 // Texture Class

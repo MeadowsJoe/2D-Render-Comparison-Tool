@@ -143,6 +143,7 @@
     <ClInclude Include="Graphics\Shaders.h" />
     <ClInclude Include="Graphics\Sprites.h" />
     <ClInclude Include="Graphics\stb_image.h" />
+    <ClInclude Include="Graphics\stb_image_write.h" />
     <ClInclude Include="Graphics\Texture.h" />
     <ClInclude Include="Graphics\Timer.h" />
     <ClInclude Include="Graphics\Window.h" />

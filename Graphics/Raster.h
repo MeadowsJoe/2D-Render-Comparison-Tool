@@ -376,7 +376,6 @@ public:
 
 	void draw(Core* core)
 	{
-		
 		Barrier::add(core->rendertarget, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET, core->graphicsCommandList);
 	
 		core->graphicsCommandList->OMSetRenderTargets(1, &core->rtvHandle, FALSE, &dsvHandle);
