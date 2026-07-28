@@ -41,11 +41,13 @@ public:
 	float moveSpeed;
 	int width;
 	int height;
+	float fov;
 
 	// Initializes the projection and related values
-	void init(Matrix P, int _width, int _height)
+	void init(Matrix P, int _width, int _height, float _fov)
 	{
 		projection = P;
+		fov = _fov;
 		inverseProjection = P.invert();
 		width = _width;
 		height = _height;

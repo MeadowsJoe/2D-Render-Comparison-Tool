@@ -40,7 +40,7 @@ public:
 	D3D12_INDEX_BUFFER_VIEW quadIBV;
 	int instanceCount;
 	int quadIndexCount;
-	int maxInstances = 32;
+	int maxInstances = 32768;
 	D3D12_GPU_DESCRIPTOR_HANDLE ibHandle;
 
 	// Camera
@@ -51,10 +51,11 @@ public:
 	D3D12_RECT scissorRect;
 	
 	const FLOAT bgColor[4]{ 0.0f, 0.0f, 0.0f, 1.0f };
-	std::vector<Sprite> sprites;
+	SpriteSystem* spriteSys;
 
-	void init(Core* core, Shaders* shaders)
+	void init(Core* core, Shaders* shaders, SpriteSystem* _spriteSys)
 	{
+		spriteSys = _spriteSys;
 		createDepthBuffer(core); // need onResize() path for adapting to screen size changes
 		createRootSignature(core);
 		createQuadBuffers(core);
@@ -239,8 +240,8 @@ public:
 		std::vector<unsigned int> indices;
 		buildUnitQuad(verts, indices);
 
-		quadVertexBuffer = createDefaultBuffer(core, verts.data(), verts.size() * sizeof(STATIC_VERTEX));
-		quadIndexBuffer = createDefaultBuffer(core, indices.data(), indices.size() * sizeof(unsigned int));
+		quadVertexBuffer = createDefaultBuffer(core, verts.data(), static_cast<int>(verts.size() * sizeof(STATIC_VERTEX)));
+		quadIndexBuffer = createDefaultBuffer(core, indices.data(), static_cast<int>(indices.size() * sizeof(unsigned int)));
 
 		quadVBV.BufferLocation = quadVertexBuffer->GetGPUVirtualAddress();
 		quadVBV.StrideInBytes = sizeof(STATIC_VERTEX);
@@ -255,22 +256,22 @@ public:
 	void uploadInstanceBuffer(Core*)
 	{
 		std::vector<RasterInstanceData> frameArray;
-		frameArray.resize(sprites.size());
+		frameArray.resize(spriteSys->sprites.size());
 		for (int i = 0; i < frameArray.size(); i++)
 		{
-			frameArray[i].transform = makeTransform(sprites[i].pos, sprites[i].w, sprites[i].h);
-			frameArray[i].textureID = sprites[i].textureID;
+			frameArray[i].transform = makeTransform(spriteSys->sprites[i].pos, spriteSys->sprites[i].w, spriteSys->sprites[i].h);
+			frameArray[i].textureID = spriteSys->sprites[i].textureID;
 		}
 
 		memcpy(mappedPtr, frameArray.data(), frameArray.size() * sizeof(RasterInstanceData));
-		instanceCount = sprites.size();
+		instanceCount = static_cast<int>(spriteSys->sprites.size());
 	}
 
-	void createInstanceBuffers(Core* core, int maxInstances)
+	void createInstanceBuffers(Core* core, int _maxInstances)
 	{
 		D3D12_RESOURCE_DESC bd = {};
 		bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		bd.Width = maxInstances * sizeof(RasterInstanceData);
+		bd.Width = _maxInstances * sizeof(RasterInstanceData);
 		bd.Height = 1;
 		bd.DepthOrArraySize = 1;
 		bd.MipLevels = 1;
@@ -295,7 +296,7 @@ public:
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = maxInstances;
+		srvDesc.Buffer.NumElements = _maxInstances;
 		srvDesc.Buffer.StructureByteStride = sizeof(RasterInstanceData);
 		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
@@ -351,27 +352,6 @@ public:
 		scissorRect.right = core->width;
 		scissorRect.top = 0;
 		scissorRect.bottom = core->height;
-	}
-
-	// Update triangles pos
-	void update(float t)
-	{
-		for (int i = 0; i < sprites.size(); i++)
-		{
-			switch (sprites[i].role) {
-			case OFoccluder:
-				break;
-			case Mirror:
-				break;
-			case Occluder:
-			{
-				sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
-			}
-			break;
-			case Background:
-				break;
-			}
-		}
 	}
 
 	void draw(Core* core)

@@ -120,9 +120,9 @@ public:
     }
 
     // Update a specific variable in the constant buffer.
-    void update(std::string name, void* data)
+    void update(std::string _name, void* data)
     {
-        ConstantBufferVariable cbVariable = constantBufferData[name];
+        ConstantBufferVariable cbVariable = constantBufferData[_name];
         memcpy(&buffer[cbVariable.offset], data, cbVariable.size);
         dirty = 1;
     }

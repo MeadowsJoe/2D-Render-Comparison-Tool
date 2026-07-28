@@ -28,14 +28,12 @@ SOFTWARE.
 #include "Graphics/Shaders.h"
 #include "Graphics/Timer.h"
 #include "Graphics/Texture.h"
-#include "Graphics/GEMLoader.h"
-#include "Graphics/RTSceneLoader.h"
 #include "Graphics/Sprites.h"
 #include "Graphics/PerfLogger.h"
 #include "Graphics/Raster.h"
 
-enum class RenderMode { RayTracing, Raster };
-constexpr RenderMode ACTIVE_MODE = RenderMode::Raster;
+
+constexpr RenderMode ACTIVE_MODE = RenderMode::RayTracing;
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -67,73 +65,25 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     if (ACTIVE_MODE == RenderMode::RayTracing)
     {
         shaders.load(&core, shaderName);
-        spriteSys.init(&core, &scene);
+        spriteSys.init(&core, &scene, ACTIVE_MODE);
     }
     else
     {
-        rasterSys.init(&core, &shaders);
+        rasterSys.init(&core, &shaders, &spriteSys);
     }
-   
-    // Load and build the scene
-    scene.reset();
-    
-    //BG
-    textures.load(&core, "Sprites/colored_desert.png");
-    int bgTexID = textures.find("Sprites/colored_desert.png");
-    Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
-
-    //BG offscreen
-    textures.load(&core, "Sprites/colored_grass.png");
-    int offBGTexID = textures.find("Sprites/colored_grass.png");
-    Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
-
-    // Create sprites in the scene
-    textures.load(&core, "Sprites/alienGreen_stand.png");
-    int spriteTexID = textures.find("Sprites/alienGreen_stand.png");
-    Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -50.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID, a.role = Occluder;
-    Sprite b; b.startPos = b.pos = Vec3(-0.5f, 0.0f, -50.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID, b.role = Occluder;
-    Sprite c; c.startPos = c.pos = Vec3(0.5f, 0.0f, -50.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID, c.role = Occluder;
-    Sprite d; d.startPos = d.pos = Vec3(1.5f, 0.0f, -50.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID, d.role = Occluder;
-    
-    // Mirror object
-    textures.load(&core, "Sprites/mirror.png");
-    int mirrorTexID = textures.find("Sprites/mirror.png");
-    Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
-
-    // Off screen Occluder
-    textures.load(&core, "Sprites/alienPink_stand.png");
-    int ofOccTexID = textures.find("Sprites/alienPink_stand.png");
-    Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = OFoccluder;
-
-    if (ACTIVE_MODE == RenderMode::RayTracing)
-    {
-        spriteSys.addSprite(&scene, bg);
-        spriteSys.addSprite(&scene, offbg);
-        spriteSys.addSprite(&scene, a);
-        spriteSys.addSprite(&scene, b);
-        spriteSys.addSprite(&scene, c);
-        spriteSys.addSprite(&scene, d);
-        spriteSys.addSprite(&scene, mir);
-        spriteSys.addSprite(&scene, ofOcc);
-    }
-    else
-    {
-        rasterSys.sprites.push_back(bg);
-        rasterSys.sprites.push_back(offbg);
-        rasterSys.sprites.push_back(a);
-        rasterSys.sprites.push_back(b);
-        rasterSys.sprites.push_back(c);
-        rasterSys.sprites.push_back(d);
-        rasterSys.sprites.push_back(mir);
-        rasterSys.sprites.push_back(ofOcc);
-    }
-
+  
     // Camera Setup
-    Matrix P = Matrix::perspective(0.1f, 1000.0f, (float)width / (float)height, 1.0f);
-    camera.init(P, width, height);
+    float fov = 1.0f;
+    Matrix P = Matrix::perspective(0.1f, 1000.0f, (float)width / (float)height, fov);
+    camera.init(P, width, height, fov);
     Matrix V = Matrix::lookAt(Vec3(0.0f, 0.0f, 500.0f), Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
     camera.initView(V);
     camera.moveSpeed = 0.1f;
+
+    // Select scene
+    //spriteSys.sceneOneSetup(&core, &scene, &textures);
+    //spriteSys.sceneTwoSetup(&core, &scene, &textures, &camera, 64);
+    spriteSys.sceneThreeSetup(&core, &scene, &textures, &camera, 64);
 
     // Point light source
     Vec3 lightPos = Vec3(10.0f, 1.0f, 600.0f);
@@ -230,10 +180,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         // Update time
         t += dt;
 
+        if (!logStarted)
+            spriteSys.update(&scene, t);
+
         if (ACTIVE_MODE == RenderMode::RayTracing)
         {
-            if (!logStarted)
-                spriteSys.update(&scene, t);
             updateTLAS(&core, &scene);
 
             // Update shader constants with current camera matrices
@@ -255,8 +206,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         }
         else
         {
-            if (!logStarted)
-                rasterSys.update(t);
             rasterSys.uploadInstanceBuffer(&core);
             rasterSys.updateCameraBuffer(&camera);
             rasterSys.draw(&core);
@@ -282,7 +231,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         {
             caputreFrame++;
 
-            params.nSprites = (ACTIVE_MODE == RenderMode::RayTracing) ? spriteSys.sprites.size() : rasterSys.sprites.size(); 
+            params.nSprites = static_cast<int>(spriteSys.sprites.size()); 
             params.nSamples = shadowSamples; 
             params.nLights = 1;
             perf.log(dt * 1000, caputreFrame, params);

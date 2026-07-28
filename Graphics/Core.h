@@ -171,14 +171,14 @@ public:
         // Choose the adapter with the most dedicated video memory
         unsigned long long maxVideoMemory = 0;
         int useAdapterIndex = 0;
-        for (int i = 0; i < adapters.size(); i++)
+        for (int j = 0; j < adapters.size(); j++)
         {
             DXGI_ADAPTER_DESC desc;
-            adapters[i]->GetDesc(&desc);
+            adapters[j]->GetDesc(&desc);
             if (desc.DedicatedVideoMemory > maxVideoMemory)
             {
                 maxVideoMemory = desc.DedicatedVideoMemory;
-                useAdapterIndex = i;
+                useAdapterIndex = j;
             }
         }
         IDXGIAdapter* adapter = adapters[useAdapterIndex];

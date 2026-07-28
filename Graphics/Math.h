@@ -388,10 +388,6 @@ public:
 	{
 		return Vec3(m[12], m[13], m[14]);
 	}
-	void extractAngleAxis(Vec3& axis, float& angle) // Add this
-	{
-
-	}
 };
 
 class Quaternion

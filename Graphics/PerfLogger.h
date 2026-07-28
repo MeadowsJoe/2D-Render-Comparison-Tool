@@ -45,16 +45,9 @@ public:
 			<< "," << "Number of Samples" << "," << "Number of Lights" << "\n";
 	}
 
-	void log(float ms, int frames, Params params, bool breakLog = false)
+	void log(float ms, int frames, Params params)
 	{
 		if (!outfile.is_open()) return;
-
-		if (breakLog)
-		{
-			outfile << "----" << "," << "----" << "," << "----" << ","
-				<< "----" << "," << "----" << "\n";
-			return;
-		}
 
 		outfile << frames << "," << ms << "," << params.nSprites << ","
 			<< params.nSamples << "," << params.nLights << "\n";

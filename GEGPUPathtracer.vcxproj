@@ -134,12 +134,10 @@
   <ItemGroup>
     <ClInclude Include="Graphics\Camera.h" />
     <ClInclude Include="Graphics\Core.h" />
-    <ClInclude Include="Graphics\GEMLoader.h" />
     <ClInclude Include="Graphics\Math.h" />
     <ClInclude Include="Graphics\PerfLogger.h" />
     <ClInclude Include="Graphics\Raster.h" />
     <ClInclude Include="Graphics\Scene.h" />
-    <ClInclude Include="Graphics\RTSceneLoader.h" />
     <ClInclude Include="Graphics\Shaders.h" />
     <ClInclude Include="Graphics\Sprites.h" />
     <ClInclude Include="Graphics\stb_image.h" />

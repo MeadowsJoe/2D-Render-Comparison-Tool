@@ -213,8 +213,6 @@ public:
     Texture* loadFromMemory(Core* core, int width, int height, int channels, T* data)
     {
         Texture* texture = new Texture();
-        // Calculate aligned row width (must be a multiple of 256 bytes)
-        unsigned int alignedWidth = ((width * channels) + 255) & ~255;
         const DXGI_FORMAT format = DXGIFormatTraits<T>::format;
         texture->init(core, width, height, channels, sizeof(T), format, data, &core->uavsrvHeap);
         return texture;

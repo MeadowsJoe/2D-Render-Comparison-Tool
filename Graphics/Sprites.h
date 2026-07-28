@@ -3,9 +3,12 @@
 
 #include "Core.h"
 #include "Scene.h"
+#include "Camera.h"
 
 #include <vector>
 #include <string>
+
+enum class RenderMode { RayTracing, Raster };
 
 //Geometry for unit quad centred on 0,0 in XY, facing z, uv 0-1
 inline void buildUnitQuad(std::vector<STATIC_VERTEX>& verts, std::vector<unsigned int>& indices)
@@ -65,8 +68,7 @@ void updateTLAS(Core* core, Scene* scene)
 	core->graphicsCommandList->ResourceBarrier(1, &barrier);
 }
 
-enum Role { OFoccluder, Mirror, Occluder, Background };
-
+enum Role { Stationary, Mirror, Moving, Background };
 
 inline ThreeFourTransform makeTransform(Vec3 pos, float w, float h)
 {
@@ -95,12 +97,13 @@ public:
 	Mesh* quad = nullptr;
 	std::string key;
 	std::vector<Sprite> sprites;
+	RenderMode ACTIVE_MODE;
 
 
 	// Create shared quad
 	// Store in global buffers
 	// Build instanced BLAS
-	void init(Core* core, Scene* scene)
+	void init(Core* core, Scene* scene, RenderMode active_mode)
 	{
 		key = "unit_quad";
 
@@ -112,6 +115,8 @@ public:
 
 		quad = new Mesh;
 		quad->init(core, verts, indices);
+
+		ACTIVE_MODE = active_mode;
 	}
 
 
@@ -121,17 +126,19 @@ public:
 		for (int i = 0; i < sprites.size(); i ++)
 		{
 			switch (sprites[i].role) {
-			case OFoccluder:
+			case Stationary:
 				break;
 			case Mirror:
 				break;
-			case Occluder:
+			case Moving:
 			{
 				sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
 
-				ThreeFourTransform tr = makeTransform(sprites[i].pos, sprites[i].w, sprites[i].h);
-
-				scene->transforms[i] = tr;
+				if (ACTIVE_MODE == RenderMode::RayTracing)
+				{
+					ThreeFourTransform tr = makeTransform(sprites[i].pos, sprites[i].w, sprites[i].h);
+					scene->transforms[i] = tr;
+				}
 			}
 				break;
 			case Background:
@@ -145,15 +152,174 @@ public:
 	{
 		sprites.push_back(s);
 		
-		ThreeFourTransform t = makeTransform(s.pos, s.w, s.h);
+		if (ACTIVE_MODE == RenderMode::RayTracing)
+		{
+			ThreeFourTransform t = makeTransform(s.pos, s.w, s.h);
 
-		scene->meshes.push_back(quad);
-		scene->transforms.push_back(t);
+			scene->meshes.push_back(quad);
+			scene->transforms.push_back(t);
 
-		InstanceData inst;
-		inst.updatetextureID(s.textureID);
-		inst.updateBSDFType(s.bsdfType);
-		inst.startIndex = scene->indexOffset[key];
-		scene->instanceData.push_back(inst);
+			InstanceData inst;
+			inst.updatetextureID(s.textureID);
+			inst.updateBSDFType(s.bsdfType);
+			inst.startIndex = scene->indexOffset[key];
+			scene->instanceData.push_back(inst);
+		}
+	}
+
+	void addSpriteGrid(Core* core, Scene* scene, Textures* textures, Camera* camera, 
+		int count, float z, Role role, const std::string& texPath, float fillFraction = 0.8f)
+	{
+		textures->load(core, texPath);
+		int texID = textures->find(texPath);
+
+		int cols = (int)ceilf(sqrtf((float)count));
+		int rows = (int)ceilf((float)count / cols);
+
+		float distance = camera->position.z - z;
+
+		float fovRadians = camera->fov * 3.141592654f / 180.0f;
+		float halfHeight = tanf(fovRadians * 0.5f) * distance;
+		float halfWidth = halfHeight * ((float)camera->width / (float)camera->height);
+
+		float usableWidth = 2.0f * halfWidth * fillFraction;
+		float usableHeight = 2.0f * halfHeight * fillFraction;
+
+		float spacingX = cols > 1 ? usableWidth / (cols - 1) : 0.0f;
+		float spacingY = rows > 1 ? usableHeight / (rows - 1) : 0.0f;
+
+		Vec3 origin(-usableWidth * 0.5f, -usableHeight * 0.5f, z);
+
+		for (int i = 0; i < count; i++)
+		{
+			int row = i / cols;
+			int col = i % cols;
+			Sprite s;
+			s.pos = s.startPos = Vec3(origin.x + col * spacingX, origin.y + row * spacingY, z + i * 0.001f);
+			s.w = 1.0f; s.h = 1.0f;
+			s.textureID = texID;
+			s.role = role;
+			addSprite(scene, s);
+		}
+	}
+
+	void addSpriteRing(Core* core, Scene* scene, Textures* textures, Camera* camera,
+		int count, float zPlane, Role role, const std::string& texPath, float radiusMargin = 1.5f)
+	{
+		textures->load(core, texPath);
+		int texID = textures->find(texPath);
+
+		float distance = camera->position.z - zPlane;
+		float fovRadians = camera->fov * 3.141592654f / 180.0f;
+		float halfHeight = tanf(fovRadians * 0.5f) * distance;
+		float halfWidth = halfHeight * ((float)camera->width / (float)camera->height);
+
+		float diagonal = sqrtf(halfWidth * halfWidth + halfHeight * halfHeight);
+		float radius = diagonal * radiusMargin;
+
+		for (int i = 0; i < count; i++)
+		{
+			float angle = (2.0f * 3.141592654f * i) / (float)count;
+			Sprite s;
+			s.pos = s.startPos = Vec3(
+				camera->position.x + cosf(angle) * radius,
+				camera->position.y + sinf(angle) * radius,
+				zPlane + i * 0.001f);
+			s.w = 1.0f; s.h = 1.0f;
+			s.textureID = texID;
+			s.role = role;
+			addSprite(scene, s);
+		}
+	}
+
+	void sceneOneSetup(Core* core, Scene* scene, Textures* textures)
+	{
+		//BG
+		textures->load(core, "Sprites/colored_desert.png");
+		int bgTexID = textures->find("Sprites/colored_desert.png");
+		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
+
+		//BG offscreen
+		textures->load(core, "Sprites/colored_grass.png");
+		int offBGTexID = textures->find("Sprites/colored_grass.png");
+		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+
+		// Create sprites in the scene
+		textures->load(core, "Sprites/alienGreen_stand.png");
+		int spriteTexID = textures->find("Sprites/alienGreen_stand.png");
+		Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -50.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID, a.role = Moving;
+		Sprite b; b.startPos = b.pos = Vec3(-0.5f, 0.0f, -50.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID, b.role = Moving;
+		Sprite c; c.startPos = c.pos = Vec3(0.5f, 0.0f, -50.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID, c.role = Moving;
+		Sprite d; d.startPos = d.pos = Vec3(1.5f, 0.0f, -50.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID, d.role = Moving;
+
+		// Mirror object
+		textures->load(core, "Sprites/mirror.png");
+		int mirrorTexID = textures->find("Sprites/mirror.png");
+		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+
+		// Off screen Occluder
+		textures->load(core, "Sprites/alienPink_stand.png");
+		int ofOccTexID = textures->find("Sprites/alienPink_stand.png");
+		Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = Stationary;
+
+		addSprite(scene, bg);
+		addSprite(scene, offbg);
+		addSprite(scene, a);
+		addSprite(scene, b);
+		addSprite(scene, c);
+		addSprite(scene, d);
+		addSprite(scene, mir);
+		addSprite(scene, ofOcc);
+	}
+
+	void sceneTwoSetup(Core* core, Scene* scene, Textures* textures, Camera* camera, int count)
+	{
+		//BG
+		textures->load(core, "Sprites/colored_grass.png");
+		int bgTexID = textures->find("Sprites/colored_grass.png");
+		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
+
+		//BG offscreen
+		textures->load(core, "Sprites/colored_desert.png");
+		int offBGTexID = textures->find("Sprites/colored_desert.png");
+		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+
+		// Create sprites in the scene
+		addSpriteGrid(core, scene, textures, camera, count, -35.0f, Stationary, "Sprites/alienGreen_stand.png");
+
+		// Mirror object
+		textures->load(core, "Sprites/mirror.png");
+		int mirrorTexID = textures->find("Sprites/mirror.png");
+		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+
+		addSprite(scene, bg);
+		addSprite(scene, offbg);
+		addSprite(scene, mir);
+	}
+
+	void sceneThreeSetup(Core* core, Scene* scene, Textures* textures, Camera* camera, int count)
+	{
+		//BG
+		textures->load(core, "Sprites/colored_grass.png");
+		int bgTexID = textures->find("Sprites/colored_grass.png");
+		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
+
+		//BG offscreen
+		textures->load(core, "Sprites/colored_desert.png");
+		int offBGTexID = textures->find("Sprites/colored_desert.png");
+		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+
+		// Create sprites in the scene
+		addSpriteRing(core, scene, textures, camera, count, -50.0f, Stationary, "Sprites/alienPink_stand.png");
+
+
+		// Mirror object
+		textures->load(core, "Sprites/mirror.png");
+		int mirrorTexID = textures->find("Sprites/mirror.png");
+		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+
+		addSprite(scene, bg);
+		addSprite(scene, offbg);
+		addSprite(scene, mir);
 	}
 };
