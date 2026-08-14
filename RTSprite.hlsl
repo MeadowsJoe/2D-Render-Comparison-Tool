@@ -525,7 +525,7 @@ bool isLight(HitData hitData)
 }
 
 // Determines visibility between two points by casting a shadow ray; returns true if there is no occluder between the points
-bool visible(float3 p1, float3 p2)
+bool visible(float3 p1, float3 p2, uint seed)
 {
     float3 dir = p2 - p1;
     float l = length(dir);
@@ -540,6 +540,7 @@ bool visible(float3 p1, float3 p2)
     // Mark this payload as a shadow ray
     shadowPayload.flags = encodeIsShadow(shadowPayload.flags);
     shadowPayload.pathThroughput.r = 0;
+    shadowPayload.rndState = seed;
     TraceRay(scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 0, 0, shadowRay, shadowPayload);
     return shadowPayload.pathThroughput.r > 0;
 }
@@ -556,7 +557,7 @@ float3 calculateDirect(HitData hitData, inout uint rndState)
         float pdf = uniformSpherePDF();
         if (dot(hitData.normal, wi) > 0)
         {
-            if (visible(hitData.pos + (wi * 1000), hitData.pos))
+            if (visible(hitData.pos + (wi * 1000), hitData.pos, rndState))
             {
                 return evaluateEnvironmentMap(wi) * evaluateBSDF(hitData, wi) * dot(hitData.normal, wi) / (pmf * pdf);
             }
@@ -578,7 +579,7 @@ float3 calculateDirect(HitData hitData, inout uint rndState)
         if (GTerm > 0)
         {
             // Check if the light is visible from the hit point
-            if (visible(p, hitData.pos))
+            if (visible(p, hitData.pos, rndState))
             {
                 return light.Le * evaluateBSDF(hitData, wi) * GTerm / (pmf * pdf);
             }
@@ -626,90 +627,49 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
             float3 offset = uniformSampleSphere(rnd(payload.rndState), rnd(payload.rndState)) * lightRadius;
             float3 samplePos = lightPosition + offset;
 
-            if (visible(hitData.pos, samplePos)) litCount += 1.0f;
+            if (visible(hitData.pos, samplePos, payload.rndState)) litCount += 1.0f;
         }
 
         float shadow = litCount / (float)shadowSamples;
         payload.colour = spriteColour * lerp(0.5f, 1.0f, shadow);
-        return;
-    }
-
-   
-
-    /* ---- - OLD CODE------
-
-    // If the hit object is a light and it's the first bounce, return its emitted light
-    if (isLight(hitData) && (payload.depth == 0 || decodeIsSpecular(payload.flags)))
-    {
-        payload.colour = float3(hitData.instance.bsdfData[0], hitData.instance.bsdfData[1], hitData.instance.bsdfData[2]);
-
-        return;
-    }
-
-    // Accumulate direct lighting contribution
-    payload.colour = payload.colour + (payload.pathThroughput * calculateDirect(hitData, payload.rndState));
-
-    // Terminate recursion if maximum depth reached
-    if (payload.depth == 6)
-    {
-        return;
-    }
-
-    // Apply Russian Roulette termination for deeper bounces
-    if (payload.depth > 3)
-    {
-        float q = min(dot(payload.pathThroughput, float3(0.2126, 0.7152, 0.0722)), 0.7);
-        if (rnd(payload.rndState) < q || payload.depth == 7)
+        
+        if(hitData.bsdf == 4)
         {
-            return;
+            float alpha = textures[texID].SampleLevel(samplerState, hitData.uv, 0).a;
+            float3 frontColour = payload.colour;
+            
+            if (payload.depth >= 4){ payload.colour = float3(0, 0, 0); return; }
+            payload.depth = payload.depth + 1;
+            
+            RayDesc tRay;
+            tRay.Origin = hitData.pos + WorldRayDirection() * 0.001;
+            tRay.Direction = WorldRayDirection();
+            tRay.TMin = 0.001;
+            tRay.TMax = 1000;
+            
+            TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, tRay, payload);
+            
+            payload.colour = alpha * frontColour + (1 - alpha) * payload.colour;
         }
-        payload.pathThroughput = payload.pathThroughput / (1.0f - q);
-    }
-
-    // Sample indirect illumination from the BSDF
-    float3 wi;
-    float pdf;
-    float3 indirect;
-    bool isSpecular;
-    wi = sampleBSDF(hitData, payload.rndState, indirect, pdf, isSpecular);
-
-    // Check if pdf is valid
-    if (pdf <= 0)
-    {
         return;
     }
-
-    // Update the path throughput
-    payload.pathThroughput = payload.pathThroughput * indirect * abs(dot(wi, hitData.normal)) / pdf;
-    payload.depth = payload.depth + 1;
-    if (isSpecular)
-    {
-        payload.flags = encodeIsSpecular(payload.flags);
-    } else
-    {
-        payload.flags = clearSpecular(payload.flags);
-    }
-
-    // Set up the ray for the indirect bounce
-    RayDesc ray;
-    ray.Origin = hitData.pos + (dot(wi, hitData.normal) > 0 ? hitData.normal : -hitData.normal) * 0.001;
-    ray.Direction = wi;
-    ray.TMin = 0.001;
-    ray.TMax = 1000;
-
-    // Trace the indirect ray
-    TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
-
-    */
 }
 
 [shader("anyhit")]
 void AnyHit(inout Payload payload, BuiltInTriangleIntersectionAttributes attrib)
 {
     HitData hitData = calculateHitData(attrib);
-
+   
     uint texID = hitData.instance.bsdfAlbedoID & 0xffff;
-    
     float a = textures[texID].SampleLevel(samplerState, hitData.uv, 0).a;
+     
+    if (hitData.bsdf == 4)
+    {
+        if(decodeIsShadow(payload.flags))
+            if (rnd(payload.rndState) > a) IgnoreHit();
+        return;
+    }
+    
     if (a < 0.5f) IgnoreHit();
+    
 }

@@ -2,7 +2,7 @@
 
 #include <fstream>
 #include <iomanip>
-#include <ctime>
+#include <filesystem>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -10,47 +10,44 @@
 #define __STDC_LIB_EXT1__
 #include "stb_image_write.h"
 
-struct Params
-{
-	int nSprites;
-	int nSamples;
-	int nLights;
-};
+#include "Params.h"
 
 class PerfLogger
 {
 public:
 	std::ofstream outfile;
-	char timeStamp[32];
 
-	void setTimestamp()
+	std::filesystem::path buildDir(const Params& params)
 	{
-		timeStamp[32] = NULL;
-		std::time_t now = std::time(nullptr);
-		std::tm my_time;
-		localtime_s(&my_time, &now);
-		std::strftime(timeStamp, sizeof(timeStamp), "%Y-%m-%d_%H-%M-%S", &my_time);
+		std::string resFolder = std::to_string(params.width) + "x" + std::to_string(params.height);
+		std::string spriteFolder = std::to_string(params.nOnScreen + params.nOffScreen) + "sprites";
+
+		std::filesystem::path dir = std::filesystem::path("PerformanceLogs") / resFolder / spriteFolder;
+		std::filesystem::create_directories(dir);
+		return dir;
 	}
 
-	void open(std::string mode)
+	void open(int scene, const std::string& mode, const Params& params)
 	{
-		std::string prefix = "PerformanceLogs/" + mode + "_Log_";
-		setTimestamp();
-		std::string filename = prefix + timeStamp + ".csv";
+		std::filesystem::path filepath = buildDir(params) / ("Scene" + std::to_string(scene) + "_" + mode + "_" + "SS" + std::to_string(params.nShadowSamples) + "_" + "Glass" + std::to_string(params.usingGlass) + ".csv");
 
-		outfile.open(filename);
+		outfile.open(filepath);
 		outfile << std::fixed << std::setprecision(4);
 
-		outfile << "Frames" << "," << "ms per frame" << "," << "Number of Sprites"
-			<< "," << "Number of Samples" << "," << "Number of Lights" << "\n";
+		outfile << "Mode" << "," << "Frames" << "," << "ms per frame" << ","
+			<< "Width" << "," << "Height" << ","
+			<< "Prims On Screen" << "," << "Prims Off Screen" << ","
+			<< "Shadow Samples" << "\n";
 	}
 
-	void log(float ms, int frames, Params params)
+	void log(const std::string& mode, float ms, int frames, const Params& params)
 	{
 		if (!outfile.is_open()) return;
 
-		outfile << frames << "," << ms << "," << params.nSprites << ","
-			<< params.nSamples << "," << params.nLights << "\n";
+		outfile << mode << "," << frames << "," << ms << ","
+			<< params.width << "," << params.height << ","
+			<< params.nOnScreen << "," << params.nOffScreen << ","
+			<< params.nShadowSamples << "\n";
 	}
 
 	void close()
@@ -59,7 +56,7 @@ public:
 		outfile.close();
 	}
 
-	void screenCapture(Core* core, std::string mode)
+	void screenCapture(Core* core, int scene, const std::string& mode, const Params& params)
 	{
 		int width = core->width;
 		int height = core->height;
@@ -125,9 +122,8 @@ public:
 		readbackBuffer->Unmap(0, nullptr);
 		readbackBuffer->Release();
 
-		std::string prefix = "PerformanceLogs/"+ mode + "_SS_";
-		std::string filename = prefix + timeStamp + ".png";
+		std::filesystem::path filepath = buildDir(params) / ("Scene" + std::to_string(scene) + "_" + mode + "_" + "SS" + std::to_string(params.nShadowSamples) + "_" + "Glass" + std::to_string(params.usingGlass) + ".png");
 
-		stbi_write_png(filename.c_str(), width, height, 3, rgb.data(), width * 3);
+		stbi_write_png(filepath.string().c_str(), width, height, 3, rgb.data(), width * 3);
 	}
 };

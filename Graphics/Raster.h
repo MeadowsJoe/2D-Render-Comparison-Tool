@@ -171,7 +171,7 @@ public:
 
 		psoDesc.DepthStencilState.DepthEnable = TRUE;
 		psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
 		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 
 		psoDesc.NumRenderTargets = 1;
@@ -360,7 +360,7 @@ public:
 	
 		core->graphicsCommandList->OMSetRenderTargets(1, &core->rtvHandle, FALSE, &dsvHandle);
 		core->graphicsCommandList->ClearRenderTargetView(core->rtvHandle, bgColor, 0, nullptr);
-		core->graphicsCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		core->graphicsCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 		core->graphicsCommandList->SetDescriptorHeaps(1, &core->uavsrvHeap.heap);
 		core->graphicsCommandList->SetPipelineState(pso);
 		core->graphicsCommandList->SetGraphicsRootSignature(rootSignature);

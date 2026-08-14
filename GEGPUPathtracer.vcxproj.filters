@@ -48,6 +48,9 @@
     <ClInclude Include="Graphics\Sprites.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Graphics\Params.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Graphics">
@@ -63,6 +66,9 @@
     </None>
     <None Include="RasSprite.hlsl">
       <Filter>Source Files</Filter>
+    </None>
+    <None Include="Graphics\analyze_perf.py">
+      <Filter>Graphics</Filter>
     </None>
   </ItemGroup>
 </Project>

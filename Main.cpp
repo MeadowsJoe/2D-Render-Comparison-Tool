@@ -31,6 +31,8 @@ SOFTWARE.
 #include "Graphics/Sprites.h"
 #include "Graphics/PerfLogger.h"
 #include "Graphics/Raster.h"
+#include "Graphics/Params.h"
+
 
 
 constexpr RenderMode ACTIVE_MODE = RenderMode::RayTracing;
@@ -38,8 +40,8 @@ constexpr RenderMode ACTIVE_MODE = RenderMode::RayTracing;
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     // Retrieve the scene dimensions
-    int width = 1024;
-    int height = 1024;
+    int width = 1280;
+    int height = 720;
 
     // Create the application window
     Window win;
@@ -74,22 +76,36 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
   
     // Camera Setup
     float fov = 1.0f;
-    Matrix P = Matrix::perspective(0.1f, 1000.0f, (float)width / (float)height, fov);
+    Matrix P = Matrix::perspective(1000.0f, 0.1f, (float)width / (float)height, fov);
     camera.init(P, width, height, fov);
     Matrix V = Matrix::lookAt(Vec3(0.0f, 0.0f, 500.0f), Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
     camera.initView(V);
     camera.moveSpeed = 0.1f;
 
     // Select scene
-    //spriteSys.sceneOneSetup(&core, &scene, &textures);
-    //spriteSys.sceneTwoSetup(&core, &scene, &textures, &camera, 64);
-    spriteSys.sceneThreeSetup(&core, &scene, &textures, &camera, 64);
+    Params params{ width, height };
+    int sceneSelection = 2;
+
+    if(sceneSelection == 1) 
+        spriteSys.sceneOneSetup(&core, &scene, &textures, params);
+    else if (sceneSelection == 2) 
+        spriteSys.sceneTwoSetup(&core, &scene, &textures, &camera, params, 8);
+    else if (sceneSelection == 3)
+        spriteSys.sceneThreeSetup(&core, &scene, &textures, &camera, params, 4096);
+
+    if (ACTIVE_MODE == RenderMode::RayTracing)
+    {
+        params.nShadowSamples = 64;
+    }
+    else
+    {
+        params.nShadowSamples = 0;
+    }
 
     // Point light source
     Vec3 lightPos = Vec3(10.0f, 1.0f, 600.0f);
-    unsigned int shadowSamples = 64;
     shaders.updateConstant(shaderName, "CBuffer", "lightPosition", &lightPos);
-    shaders.updateConstant(shaderName, "CBuffer", "shadowSamples", &shadowSamples);
+    shaders.updateConstant(shaderName, "CBuffer", "shadowSamples", &params.nShadowSamples);
 
     if (ACTIVE_MODE == RenderMode::RayTracing)
     {
@@ -119,7 +135,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
     // Performance log
     PerfLogger perf;
-    Params params;
+    int frames = 0;
     int caputreFrame = 0;
 
     bool logStarted = false;
@@ -179,13 +195,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
         // Update time
         t += dt;
+        frames++;
 
-        if (!logStarted)
-            spriteSys.update(&scene, t);
+        spriteSys.update(&scene, t);
 
         if (ACTIVE_MODE == RenderMode::RayTracing)
         {
-            updateTLAS(&core, &scene);
+            if(sceneSelection == 1)
+                updateTLAS(&core, &scene);
 
             // Update shader constants with current camera matrices
             shaders.updateConstant(shaderName, "CBuffer", "inverseView", &camera.inverseView);
@@ -212,33 +229,36 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         }
 
         // Record performance
-        if ((win.keyPressed('C') || (t >= 10 && t <= 11)) && !logStarted)
+        if ((win.keyPressed('C') || (frames == 1000)) && !logStarted)
         {
             logStarted = true;
             caputreFrame = 0;
             if (ACTIVE_MODE == RenderMode::RayTracing)
             {
-                perf.open("RT");
-                perf.screenCapture(&core, "RT");
+                perf.open(sceneSelection, "RT", params);
+                perf.screenCapture(&core, sceneSelection, "RT", params);
             }
             else
             {
-                perf.open("Ras");
-                perf.screenCapture(&core,"Ras");
+                perf.open(sceneSelection, "Ras", params);
+                perf.screenCapture(&core, sceneSelection, "Ras", params);
             }
         }
         if (caputreFrame < 1000 && logStarted)
         {
             caputreFrame++;
+            if(ACTIVE_MODE == RenderMode::RayTracing)
+                perf.log("RayTracing", dt * 1000, caputreFrame, params);
+            else
+                perf.log("Rasterizer", dt * 1000, caputreFrame, params);
 
-            params.nSprites = static_cast<int>(spriteSys.sprites.size()); 
-            params.nSamples = shadowSamples; 
-            params.nLights = 1;
-            perf.log(dt * 1000, caputreFrame, params);
             if (caputreFrame >= 999)
             {
                 logStarted = false;
                 perf.close();
+
+                core.finishFrame();
+                break;
             }
         }
 

@@ -4,6 +4,7 @@
 #include "Core.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "Params.h"
 
 #include <vector>
 #include <string>
@@ -68,7 +69,7 @@ void updateTLAS(Core* core, Scene* scene)
 	core->graphicsCommandList->ResourceBarrier(1, &barrier);
 }
 
-enum Role { Stationary, Mirror, Moving, Background };
+enum Role { OnStationary, OnMoving, OffStationary, OffMoving, OnMirror, OffMirror, OnBackground, OffBackground, OnSemi, OffSemi };
 
 inline ThreeFourTransform makeTransform(Vec3 pos, float w, float h)
 {
@@ -126,11 +127,11 @@ public:
 		for (int i = 0; i < sprites.size(); i ++)
 		{
 			switch (sprites[i].role) {
-			case Stationary:
-				break;
-			case Mirror:
-				break;
-			case Moving:
+			case OnStationary:
+				break; 
+			case OffStationary:
+					break;
+			case OnMoving || OffMoving:
 			{
 				sprites[i].pos.x = sprites[i].startPos.x + sinf(t);
 
@@ -141,7 +142,17 @@ public:
 				}
 			}
 				break;
-			case Background:
+			case OnMirror:
+				break;
+			case OffMirror:
+				break;
+			case OnBackground:
+				break;
+			case OffBackground:
+				break;
+			case OnSemi:
+				break;
+			case OffSemi:
 				break;
 			}
 		}
@@ -232,35 +243,56 @@ public:
 		}
 	}
 
-	void sceneOneSetup(Core* core, Scene* scene, Textures* textures)
+	void countRoles(Params& params)
+	{
+		params.nOnScreen = 0;
+		params.nOffScreen = 0;
+
+		for (int i = 0; i < sprites.size(); i++)
+		{
+			Role r = sprites[i].role;
+			if (r == OnStationary || r == OnMoving || r == OnMirror || r == OnBackground || r == OnSemi )
+				params.nOnScreen++;
+			else if (r == OffStationary || r == OffMoving || r == OffMirror || r == OffBackground || r == OffSemi )
+				params.nOffScreen++;
+		}
+	}
+
+	void sceneOneSetup(Core* core, Scene* scene, Textures* textures, Params& params)
 	{
 		//BG
 		textures->load(core, "Sprites/colored_desert.png");
 		int bgTexID = textures->find("Sprites/colored_desert.png");
-		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
+		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = OnBackground;
 
 		//BG offscreen
 		textures->load(core, "Sprites/colored_grass.png");
 		int offBGTexID = textures->find("Sprites/colored_grass.png");
-		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = OffBackground;
 
 		// Create sprites in the scene
 		textures->load(core, "Sprites/alienGreen_stand.png");
 		int spriteTexID = textures->find("Sprites/alienGreen_stand.png");
-		Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -50.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID, a.role = Moving;
-		Sprite b; b.startPos = b.pos = Vec3(-0.5f, 0.0f, -50.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID, b.role = Moving;
-		Sprite c; c.startPos = c.pos = Vec3(0.5f, 0.0f, -50.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID, c.role = Moving;
-		Sprite d; d.startPos = d.pos = Vec3(1.5f, 0.0f, -50.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID, d.role = Moving;
+		Sprite a; a.startPos = a.pos = Vec3(-1.5f, 0.0f, -50.0f); a.w = 1.0f; a.h = 1.0f; a.textureID = spriteTexID, a.role = OnMoving;
+		Sprite b; b.startPos = b.pos = Vec3(-0.5f, 0.0f, -50.0f); b.w = 1.0f; b.h = 1.0f; b.textureID = spriteTexID, b.role = OnMoving;
+		Sprite c; c.startPos = c.pos = Vec3(0.5f, 0.0f, -50.0f); c.w = 1.0f; c.h = 1.0f; c.textureID = spriteTexID, c.role = OnMoving;
+		Sprite d; d.startPos = d.pos = Vec3(1.5f, 0.0f, -50.0f); d.w = 1.0f; d.h = 1.0f; d.textureID = spriteTexID, d.role = OnMoving;
+
+		// Semi transparent sprite
+		textures->load(core, "Sprites/redGlass.png");
+		int semiTexID = textures->find("Sprites/redGlass.png");
+		Sprite semi; semi.startPos = semi.pos = Vec3(1.0f, -1.0f, 0.0f); semi.w = 4.0f; semi.h = 4.0f; semi.textureID = semiTexID; semi.role = OnSemi; semi.bsdfType = 4;
+
 
 		// Mirror object
 		textures->load(core, "Sprites/mirror.png");
 		int mirrorTexID = textures->find("Sprites/mirror.png");
-		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = OnMirror; mir.bsdfType = 3;
 
 		// Off screen Occluder
 		textures->load(core, "Sprites/alienPink_stand.png");
 		int ofOccTexID = textures->find("Sprites/alienPink_stand.png");
-		Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(3.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = Stationary;
+		Sprite ofOcc; ofOcc.startPos = ofOcc.pos = Vec3(8.0f, 0.0f, 250.0f); ofOcc.w = 1.0f; ofOcc.h = 1.0f; ofOcc.textureID = ofOccTexID; ofOcc.role = OffStationary;
 
 		addSprite(scene, bg);
 		addSprite(scene, offbg);
@@ -268,58 +300,106 @@ public:
 		addSprite(scene, b);
 		addSprite(scene, c);
 		addSprite(scene, d);
-		addSprite(scene, mir);
+		addSprite(scene, mir);	
+		addSprite(scene, semi);
 		addSprite(scene, ofOcc);
+
+		for (int i = 0; i < sprites.size(); i++)
+		{
+			if (sprites[i].role == OnSemi) params.usingGlass++;
+		}
+
+		countRoles(params);
 	}
 
-	void sceneTwoSetup(Core* core, Scene* scene, Textures* textures, Camera* camera, int count)
+	void sceneTwoSetup(Core* core, Scene* scene, Textures* textures, Camera* camera, Params& params, int count)
 	{
 		//BG
 		textures->load(core, "Sprites/colored_grass.png");
 		int bgTexID = textures->find("Sprites/colored_grass.png");
-		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
+		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = OnBackground;
 
 		//BG offscreen
 		textures->load(core, "Sprites/colored_desert.png");
 		int offBGTexID = textures->find("Sprites/colored_desert.png");
-		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = OffBackground;
 
 		// Create sprites in the scene
-		addSpriteGrid(core, scene, textures, camera, count, -35.0f, Stationary, "Sprites/alienGreen_stand.png");
+		addSpriteGrid(core, scene, textures, camera, count, -35.0f, OnStationary, "Sprites/alienGreen_stand.png");
+
+		// Semi transparent sprite
+		textures->load(core, "Sprites/redGlass.png");
+		int semiTexID = textures->find("Sprites/redGlass.png");
+		Sprite semi; semi.startPos = semi.pos = Vec3(1.0f, -1.0f, 0.0f); semi.w = 4.0f; semi.h = 4.0f; semi.textureID = semiTexID; semi.role = OnSemi; semi.bsdfType = 4;
+		Sprite semi1; semi1.startPos = semi1.pos = Vec3(-1.0f, -1.0f, -10.0f); semi1.w = 4.0f; semi1.h = 4.0f; semi1.textureID = semiTexID; semi1.role = OnSemi; semi1.bsdfType = 4;
+		Sprite semi2; semi2.startPos = semi2.pos = Vec3(-1.0f, 1.0f, -20.0f); semi2.w = 4.0f; semi2.h = 4.0f; semi2.textureID = semiTexID; semi2.role = OnSemi; semi2.bsdfType = 4;
+		Sprite semi3; semi3.startPos = semi3.pos = Vec3(1.0f, 1.0f, -30.0f); semi3.w = 4.0f; semi3.h = 4.0f; semi3.textureID = semiTexID; semi3.role = OnSemi; semi3.bsdfType = 4;
+		Sprite semi4; semi4.startPos = semi4.pos = Vec3(1.2f, -1.2f, 10.0f); semi4.w = 4.0f; semi4.h = 4.0f; semi4.textureID = semiTexID; semi4.role = OnSemi; semi4.bsdfType = 4;
+		Sprite semi5; semi5.startPos = semi5.pos = Vec3(-1.2f, -1.2f, 20.0f); semi5.w = 4.0f; semi5.h = 4.0f; semi5.textureID = semiTexID; semi5.role = OnSemi; semi5.bsdfType = 4; 
+		Sprite semi6; semi6.startPos = semi6.pos = Vec3(-1.2f, 1.2f, 30.0f); semi6.w = 4.0f; semi6.h = 4.0f; semi6.textureID = semiTexID; semi6.role = OnSemi; semi6.bsdfType = 4;
+		Sprite semi7; semi7.startPos = semi7.pos = Vec3(1.2f, 1.2f, 40.0f); semi7.w = 4.0f; semi7.h = 4.0f; semi7.textureID = semiTexID; semi7.role = OnSemi; semi7.bsdfType = 4;
 
 		// Mirror object
 		textures->load(core, "Sprites/mirror.png");
 		int mirrorTexID = textures->find("Sprites/mirror.png");
-		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = OnMirror; mir.bsdfType = 3;
 
 		addSprite(scene, bg);
 		addSprite(scene, offbg);
+		addSprite(scene, semi);
+		addSprite(scene, semi1);
+		addSprite(scene, semi2);
+		addSprite(scene, semi3);
+		addSprite(scene, semi4);
+		//addSprite(scene, semi5);
+		//addSprite(scene, semi6);
+		//addSprite(scene, semi7);
 		addSprite(scene, mir);
+
+		for (int i = 0; i < sprites.size(); i++)
+		{
+			if (sprites[i].role == OnSemi) params.usingGlass++;
+		}
+
+		countRoles(params);
 	}
 
-	void sceneThreeSetup(Core* core, Scene* scene, Textures* textures, Camera* camera, int count)
+	void sceneThreeSetup(Core* core, Scene* scene, Textures* textures, Camera* camera, Params& params, int count)
 	{
 		//BG
 		textures->load(core, "Sprites/colored_grass.png");
 		int bgTexID = textures->find("Sprites/colored_grass.png");
-		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = Background;
+		Sprite bg; bg.startPos = bg.pos = Vec3(0.0f, 0.0f, -150.0f); bg.w = 16.0f; bg.h = 16.0f; bg.textureID = bgTexID, bg.role = OnBackground;
 
 		//BG offscreen
 		textures->load(core, "Sprites/colored_desert.png");
 		int offBGTexID = textures->find("Sprites/colored_desert.png");
-		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = Background;
+		Sprite offbg; offbg.startPos = offbg.pos = Vec3(10.0f, 0.0f, 950.0f); offbg.w = 20.0f; offbg.h = 20.0f; offbg.textureID = offBGTexID, offbg.role = OffBackground;
 
 		// Create sprites in the scene
-		addSpriteRing(core, scene, textures, camera, count, -50.0f, Stationary, "Sprites/alienPink_stand.png");
+		addSpriteRing(core, scene, textures, camera, count, 250.0f, OffStationary, "Sprites/alienPink_stand.png");
 
+		// Semi transparent sprite
+		textures->load(core, "Sprites/redGlass.png");
+		int semiTexID = textures->find("Sprites/redGlass.png");
+		Sprite semi; semi.startPos = semi.pos = Vec3(1.0f, -1.0f, -20.0f); semi.w = 4.0f; semi.h = 4.0f; semi.textureID = semiTexID; semi.role = OnSemi; semi.bsdfType = 4;
 
 		// Mirror object
 		textures->load(core, "Sprites/mirror.png");
 		int mirrorTexID = textures->find("Sprites/mirror.png");
-		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = Mirror; mir.bsdfType = 3;
+		Sprite mir; mir.startPos = mir.pos = Vec3(5.0f, 0.0f, -40.0f); mir.w = 5.0f; mir.h = 5.0f; mir.textureID = mirrorTexID; mir.role = OnMirror; mir.bsdfType = 3;
 
 		addSprite(scene, bg);
 		addSprite(scene, offbg);
+		addSprite(scene, semi);
 		addSprite(scene, mir);
+
+
+		for (int i = 0; i < sprites.size(); i++)
+		{
+			if (sprites[i].role == OnSemi) params.usingGlass++;
+		}
+
+		countRoles(params);
 	}
 };
