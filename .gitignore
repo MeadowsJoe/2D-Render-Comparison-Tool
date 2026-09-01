@@ -401,5 +401,5 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Textures
-Sprites/
+
 PerformanceLogs/
