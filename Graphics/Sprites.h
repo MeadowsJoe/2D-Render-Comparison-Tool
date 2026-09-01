@@ -346,11 +346,11 @@ public:
 
 		addSprite(scene, bg);
 		addSprite(scene, offbg);
-		addSprite(scene, semi);
-		addSprite(scene, semi1);
-		addSprite(scene, semi2);
-		addSprite(scene, semi3);
-		addSprite(scene, semi4);
+		//addSprite(scene, semi);
+		//addSprite(scene, semi1);
+		//addSprite(scene, semi2);
+		//addSprite(scene, semi3);
+		//addSprite(scene, semi4);
 		//addSprite(scene, semi5);
 		//addSprite(scene, semi6);
 		//addSprite(scene, semi7);
@@ -391,7 +391,7 @@ public:
 
 		addSprite(scene, bg);
 		addSprite(scene, offbg);
-		addSprite(scene, semi);
+		//addSprite(scene, semi);
 		addSprite(scene, mir);
 
 

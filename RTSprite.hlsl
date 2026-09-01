@@ -630,8 +630,15 @@ void ClosestHit(inout Payload payload, BuiltInTriangleIntersectionAttributes att
             if (visible(hitData.pos, samplePos, payload.rndState)) litCount += 1.0f;
         }
 
-        float shadow = litCount / (float)shadowSamples;
-        payload.colour = spriteColour * lerp(0.5f, 1.0f, shadow);
+        if(shadowSamples > 0)
+        {
+            float shadow = litCount / (float) shadowSamples;
+            payload.colour = spriteColour * lerp(0.5f, 1.0f, shadow);
+        }
+        else
+        {
+            payload.colour = spriteColour;
+        }
         
         if(hitData.bsdf == 4)
         {

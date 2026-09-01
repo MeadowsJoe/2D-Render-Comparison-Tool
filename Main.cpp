@@ -89,7 +89,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     if(sceneSelection == 1) 
         spriteSys.sceneOneSetup(&core, &scene, &textures, params);
     else if (sceneSelection == 2) 
-        spriteSys.sceneTwoSetup(&core, &scene, &textures, &camera, params, 8);
+        spriteSys.sceneTwoSetup(&core, &scene, &textures, &camera, params, 32);
     else if (sceneSelection == 3)
         spriteSys.sceneThreeSetup(&core, &scene, &textures, &camera, params, 4096);
 
